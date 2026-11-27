@@ -43,44 +43,78 @@ void TFTDisplay::drawMenuItem(int y, const String& label, bool selected) {
 void TFTDisplay::drawHome(int selectedItem, const String& status) {
     _tft.fillScreen(ST77XX_BLACK);
     drawHeader("ESP IR BLASTER");
-    drawMenuItem(40, "IR Receiver", selectedItem == 0);
-    drawMenuItem(76, "IR Transmitter", selectedItem == 1);
-    drawMenuItem(112, "Trackball Test", selectedItem == 2);
-    drawMenuItem(148, "SD Card Explorer", selectedItem == 3);
-    drawMenuItem(184, "Camera", selectedItem == 4);
-    drawMenuItem(220, "System Information", selectedItem == 5);
-    drawText(status, 8, 265, 1, ST77XX_GREEN, ST77XX_BLACK);
-    drawText("Use trackball: move / press", 8, 284, 1,
-             ST77XX_WHITE, ST77XX_BLACK);
+
+    drawMenuItem(43, "IR Receiver", selectedItem == 0);
+    drawMenuItem(81, "IR Transmitter", selectedItem == 1);
+    drawMenuItem(119, "Trackball Test", selectedItem == 2);
+    drawMenuItem(157, "System Information", selectedItem == 3);
+
+    drawText("SYSTEM", 10, 197, 2, ST77XX_YELLOW, ST77XX_BLACK);
+    drawText(status, 10, 220, 1, ST77XX_RED, ST77XX_BLACK);
+    drawText("Move: navigate  Press: select", 10, 245, 1, ST77XX_GREEN, ST77XX_BLACK);
 }
 
-void TFTDisplay::drawList(const String& title, const std::vector<String>& items,
-                          int selectedItem, const String& footer) {
+void TFTDisplay::drawList(const String& title,
+                          const std::vector<String>& items,
+                          int selectedItem,
+                          const String& footer) {
     _tft.fillScreen(ST77XX_BLACK);
     drawHeader(title);
 
     const int maxVisible = 7;
-    const int start = selectedItem >= maxVisible ? selectedItem - maxVisible + 1 : 0;
-    for (int row = 0; row < maxVisible && start + row < static_cast<int>(items.size()); ++row) {
+    const int start = selectedItem >= maxVisible
+        ? selectedItem - maxVisible + 1
+        : 0;
+
+    for (int row = 0;
+         row < maxVisible && start + row < static_cast<int>(items.size());
+         ++row) {
+
         const int y = 43 + row * 29;
         const bool selected = (start + row) == selectedItem;
+
         const uint16_t bg = selected ? ST77XX_RED : ST77XX_BLACK;
+
         _tft.fillRoundRect(6, y, _tft.width() - 12, 26, 4, bg);
-        drawText(String(selected ? "> " : "  ") + items[start + row],
-                 12, y + 6, 1, ST77XX_WHITE, bg);
+
+        drawText(
+            String(selected ? "> " : "  ") + items[start + row],
+            12, y + 6, 1, ST77XX_WHITE, bg
+        );
     }
+
     drawText(footer, 8, 260, 1, ST77XX_GREEN, ST77XX_BLACK);
-    drawText("Press: open  Back: return", 8, 281, 1,
-             ST77XX_WHITE, ST77XX_BLACK);
+
+    drawText(
+        "Press: open  Back: return",
+        8, 281, 1, ST77XX_WHITE, ST77XX_BLACK
+    );
 }
 
 void TFTDisplay::drawCamera(const String& status) {
     _tft.fillScreen(ST77XX_BLACK);
+
     drawHeader("CAMERA");
-    drawText("OV2640 camera", 12, 58, 2, ST77XX_WHITE, ST77XX_BLACK);
-    drawText(status, 12, 100, 1, ST77XX_YELLOW, ST77XX_BLACK);
-    drawText("Press: capture JPEG", 12, 220, 1, ST77XX_GREEN, ST77XX_BLACK);
-    drawText("Back: main menu", 12, 240, 1, ST77XX_WHITE, ST77XX_BLACK);
+
+    drawText(
+        "OV2640 camera",
+        12, 58, 2, ST77XX_WHITE, ST77XX_BLACK
+    );
+
+    drawText(
+        status,
+        12, 100, 1, ST77XX_YELLOW, ST77XX_BLACK
+    );
+
+    drawText(
+        "Press: capture JPEG",
+        12, 220, 1, ST77XX_GREEN, ST77XX_BLACK
+    );
+
+    drawText(
+        "Back: main menu",
+        12, 240, 1, ST77XX_WHITE, ST77XX_BLACK
+    );
 }
 
 void TFTDisplay::drawMessage(const String& title, const String& message) {
