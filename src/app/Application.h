@@ -28,12 +28,14 @@ private:
     Screen _screen = Screen::HOME;
     int _selectedItem = 0;
     int _selectedFile = 0;
+    int _viewerReturnSelection = 0;
     uint32_t _lastRefresh = 0;
     uint32_t _lastCameraPreview = 0;
     bool _buttonStableState = true;
     uint32_t _buttonLastAcceptedChange = 0;
     uint32_t _buttonPressedAt = 0;
     String _currentPath = "/";
+    String _viewerReturnPath = "/";
     String _cameraStatus = "Starting camera...";
     String _viewingImagePath;
     Screen _resultReturnScreen = Screen::SD_TOOLBOX;
