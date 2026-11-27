@@ -106,12 +106,12 @@ bool TFTDisplay::drawJpegFromFS(fs::FS& filesystem, const String& path) {
     _tft.setRotation(1);
     _tft.fillScreen(ST77XX_BLACK);
     _jpegTarget = this;
-    TJpg_Decoder.setJpgScale(1);
-    TJpg_Decoder.setSwapBytes(false);
-    TJpg_Decoder.setCallback(jpegOutput);
-    const uint16_t imageWidth = TJpg_Decoder.drawFsJpg(0, 0, filesystem, path.c_str());
+    TJpgDec.setJpgScale(1);
+    TJpgDec._swap = false;
+    TJpgDec.setCallback(jpegOutput);
+    const JRESULT decodeResult = TJpgDec.drawFsJpg(0, 0, path.c_str(), filesystem);
     _jpegTarget = nullptr;
-    if (imageWidth == 0) return false;
+    if (decodeResult != JDR_OK) return false;
 
     _tft.setRotation(0);
     _tft.fillRect(0, 292, DisplayConfig::WIDTH, 28, ST77XX_BLACK);
