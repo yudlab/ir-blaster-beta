@@ -1,11 +1,24 @@
 #include "CameraService.h"
 
 #include <esp_camera.h>
+#include <img_converters.h>
+#include <esp_heap_caps.h>
 #include "config.h"
 #include "storage/StorageManager.h"
 
 bool CameraService::begin() {
     if (_ready) return true;
+
+    if (!_previewBuffer) {
+        const size_t bufferBytes = static_cast<size_t>(_previewWidth) *
+                                   _previewHeight * sizeof(uint16_t);
+        _previewBuffer = static_cast<uint16_t*>(
+            heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        if (!_previewBuffer) {
+            Serial.println("[CAM] Could not allocate preview buffer in PSRAM");
+            return false;
+        }
+    }
 
     camera_config_t config = {};
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -33,7 +46,7 @@ bool CameraService::begin() {
     config.pixel_format = PIXFORMAT_JPEG;
     config.frame_size = FRAMESIZE_QVGA;
     config.jpeg_quality = 12;
-    config.fb_count = 1;
+    config.fb_count = 2;
     config.fb_location = CAMERA_FB_IN_PSRAM;
     config.grab_mode = CAMERA_GRAB_LATEST;
 
@@ -44,25 +57,69 @@ bool CameraService::begin() {
     }
 
     _ready = true;
-    Serial.println("[CAM] Camera ready");
+    Serial.println("[CAM] Camera ready (QVGA JPEG live preview)");
     return true;
+}
+
+void CameraService::end() {
+    if (_ready) {
+        esp_camera_deinit();
+        _ready = false;
+        Serial.println("[CAM] Camera stopped");
+    }
+    if (_previewBuffer) {
+        heap_caps_free(_previewBuffer);
+        _previewBuffer = nullptr;
+    }
 }
 
 bool CameraService::isReady() const {
     return _ready;
 }
 
-bool CameraService::captureAndSave(StorageManager& storage, String& savedPath) {
-    if (!_ready || !storage.isMounted()) return false;
+bool CameraService::getPreviewFrame(const uint16_t*& pixels,
+                                    uint16_t& width, uint16_t& height) {
+    pixels = nullptr;
+    width = _previewWidth;
+    height = _previewHeight;
+    if (!_ready || !_previewBuffer) return false;
 
     camera_fb_t* frame = esp_camera_fb_get();
     if (!frame) {
-        Serial.println("[CAM] Failed to acquire frame");
+        Serial.println("[CAM] Preview frame acquisition failed");
         return false;
     }
 
-    if (!storage.exists("/DCIM")) {
-        storage.createDirectory("/DCIM");
+    const bool converted = frame->format == PIXFORMAT_JPEG &&
+        fmt2rgb565(frame->buf, frame->len,
+                   reinterpret_cast<uint8_t*>(_previewBuffer), true);
+    esp_camera_fb_return(frame);
+
+    if (!converted) {
+        Serial.println("[CAM] JPEG-to-RGB565 preview conversion failed");
+        return false;
+    }
+
+    pixels = _previewBuffer;
+    return true;
+}
+
+bool CameraService::captureAndSave(StorageManager& storage, String& savedPath) {
+    if (!_ready || !storage.isMounted()) {
+        Serial.println("[CAM] Capture refused: camera or SD card is not ready");
+        return false;
+    }
+
+    camera_fb_t* frame = esp_camera_fb_get();
+    if (!frame) {
+        Serial.println("[CAM] Failed to acquire capture frame");
+        return false;
+    }
+
+    if (!storage.exists("/DCIM") && !storage.createDirectory("/DCIM")) {
+        esp_camera_fb_return(frame);
+        Serial.println("[CAM] Could not create /DCIM directory");
+        return false;
     }
 
     savedPath = "/DCIM/IMG_" + String(millis()) + ".jpg";
@@ -73,10 +130,10 @@ bool CameraService::captureAndSave(StorageManager& storage, String& savedPath) {
         return false;
     }
 
-    const size_t written = output.write(frame->buf, frame->len);
+    const size_t expected = frame->len;
+    const size_t written = output.write(frame->buf, expected);
     output.flush();
     output.close();
-    const size_t expected = frame->len;
     esp_camera_fb_return(frame);
 
     if (written != expected) {
