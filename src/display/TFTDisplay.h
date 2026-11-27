@@ -21,6 +21,7 @@ public:
     void drawCamera(const String& status);
     void drawCameraPreview(const uint16_t* pixels, uint16_t width,
                            uint16_t height, const String& status);
+    bool drawJpegFromFS(fs::FS& filesystem, const String& path);
 
 private:
     Adafruit_ST7789 _tft;
