@@ -11,14 +11,15 @@ class Application {
 public:
     void begin();
     void update();
-
-    // Hardware input drivers (e.g. the trackball) call these three methods.
     void moveSelection(int direction);
     void select();
     void back();
 
 private:
-    enum class Screen { HOME, SD_BROWSER, CAMERA, SYSTEM_INFO, MESSAGE };
+    enum class Screen {
+        HOME, SD_TOOLBOX, SD_BROWSER, SD_INFO, SD_RESULT,
+        SD_FORMAT_CONFIRM, CAMERA, SYSTEM_INFO, MESSAGE
+    };
 
     TFTDisplay _display;
     StorageManager _storage;
@@ -28,8 +29,6 @@ private:
     int _selectedItem = 0;
     int _selectedFile = 0;
     uint32_t _lastRefresh = 0;
-
-    // Debounced onboard BOOT button state (active LOW).
     bool _buttonLastReading = true;
     bool _buttonStableState = true;
     uint32_t _buttonLastChange = 0;
@@ -38,6 +37,8 @@ private:
     String _cameraStatus = "Press to initialise camera";
     String _messageTitle;
     String _messageBody;
+    String _resultTitle;
+    String _resultBody;
     std::vector<StorageEntry> _directoryEntries;
 
     void render();
@@ -45,4 +46,6 @@ private:
     void refreshDirectory();
     void openSelectedFile();
     void returnHome();
+    void runSDAction(int action);
+    void showResult(const String& title, const String& body);
 };
