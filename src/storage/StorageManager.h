@@ -12,22 +12,39 @@ struct StorageEntry {
     size_t size = 0;
 };
 
-// Owns SD_MMC mounting and generic file operations. Camera and other features
-// should use this class rather than mounting or configuring the card themselves.
+struct SDBenchmarkResult {
+    bool success = false;
+    uint64_t bytesWritten = 0;
+    uint64_t bytesRead = 0;
+    uint32_t writeMs = 0;
+    uint32_t readMs = 0;
+    bool dataVerified = false;
+};
+
 class StorageManager {
 public:
     bool begin();
     bool isMounted() const;
+    bool refresh();
 
     std::vector<StorageEntry> listDirectory(const String& path);
     bool exists(const String& path) const;
     bool createDirectory(const String& path);
     bool remove(const String& path);
+    bool rename(const String& from, const String& to);
     File openFile(const String& path, const char* mode = FILE_READ);
 
     uint64_t totalBytes() const;
     uint64_t usedBytes() const;
+    uint64_t freeBytes() const;
+    uint64_t cardSize() const;
+    String cardTypeName() const;
+
+    bool runCardTest(String& report);
+    SDBenchmarkResult runBenchmark(uint32_t testSizeBytes = 512 * 1024);
+    bool formatCard(String& report);
 
 private:
     bool _mounted = false;
+    bool ensureToolboxDirectory();
 };
