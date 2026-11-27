@@ -150,6 +150,13 @@ void Application::select() {
 }
 
 void Application::back() {
+    if (_screen == Screen::SD_RESULT) {
+        _screen = _resultReturnScreen;
+        _selectedItem = _resultReturnSelection;
+        if (_screen == Screen::SD_BROWSER) refreshDirectory();
+        render();
+        return;
+    }
     if (_screen == Screen::CAMERA) {
         _camera.end();
         returnHome();
