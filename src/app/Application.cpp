@@ -163,8 +163,16 @@ void Application::back() {
         return;
     }
     if (_screen == Screen::IMAGE_VIEWER) {
+        // Restore the exact folder and highlighted entry from which the image
+        // was opened, rather than relying on whatever browser state remains.
+        _currentPath = _viewerReturnPath;
         _screen = Screen::SD_BROWSER;
         refreshDirectory();
+        _selectedItem = _viewerReturnSelection;
+        const int maxSelection = static_cast<int>(_directoryEntries.size()) + 3;
+        if (_selectedItem > maxSelection) _selectedItem = maxSelection;
+        if (_selectedItem < 0) _selectedItem = 0;
+        _selectedFile = _selectedItem;
         render();
         return;
     }
@@ -372,6 +380,8 @@ void Application::openSelectedFile() {
 
 void Application::openImageViewer(const String& path) {
     _viewingImagePath = path;
+    _viewerReturnPath = _currentPath;
+    _viewerReturnSelection = _selectedItem;
     _screen = Screen::IMAGE_VIEWER;
     render();
 }
