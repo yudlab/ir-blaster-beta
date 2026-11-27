@@ -24,7 +24,10 @@ void Application::update() {
         if (reading == LOW) _buttonPressedAt = now;
         else {
             const uint32_t duration = now - _buttonPressedAt;
-            if (duration >= InputConfig::VERY_LONG_PRESS_MS) back();
+            if (_screen == Screen::CAMERA) {
+                if (duration >= InputConfig::LONG_PRESS_MS) back();
+                else captureCameraImage();
+            } else if (duration >= InputConfig::VERY_LONG_PRESS_MS) back();
             else if (duration >= InputConfig::LONG_PRESS_MS) select();
             else moveSelection(1);
         }
@@ -34,8 +37,17 @@ void Application::update() {
         const char key = static_cast<char>(Serial.read());
         if (key == 'w' || key == 'W') moveSelection(-1);
         else if (key == 's' || key == 'S') moveSelection(1);
-        else if (key == 'e' || key == 'E' || key == '\n') select();
+        else if (key == 'e' || key == 'E' || key == '\n') {
+            if (_screen == Screen::CAMERA) captureCameraImage();
+            else select();
+        }
         else if (key == 'b' || key == 'B') back();
+    }
+
+    if (_screen == Screen::CAMERA && _camera.isReady() &&
+        millis() - _lastCameraPreview >= 100) {
+        updateCameraPreview();
+        _lastCameraPreview = millis();
     }
     if (millis() - _lastRefresh >= 250) _lastRefresh = millis();
 }
@@ -76,20 +88,7 @@ void Application::select() {
         }
         return;
     }
-    if (_screen == Screen::CAMERA) {
-        if (!_camera.isReady()) {
-            _cameraStatus = _camera.begin() ? "Camera ready. Long press to capture."
-                                            : "Camera initialisation failed.";
-        } else if (!_storage.isMounted() && !_storage.begin()) {
-            _cameraStatus = "SD card unavailable.";
-        } else {
-            String savedPath;
-            _cameraStatus = _camera.captureAndSave(_storage, savedPath)
-                ? "Saved: " + savedPath : "Capture/save failed.";
-        }
-        render();
-        return;
-    }
+    if (_screen == Screen::CAMERA) { captureCameraImage(); return; }
     if (_screen == Screen::SD_RESULT || _screen == Screen::SD_INFO ||
         _screen == Screen::SYSTEM_INFO || _screen == Screen::MESSAGE) {
         if (_screen == Screen::SD_RESULT || _screen == Screen::SD_INFO) {
@@ -101,6 +100,11 @@ void Application::select() {
 }
 
 void Application::back() {
+    if (_screen == Screen::CAMERA) {
+        _camera.end();
+        returnHome();
+        return;
+    }
     if (_screen == Screen::SD_BROWSER && _currentPath != "/") {
         const int slash = _currentPath.lastIndexOf('/');
         _currentPath = slash <= 0 ? "/" : _currentPath.substring(0, slash);
@@ -133,12 +137,67 @@ void Application::openHomeItem() {
             break;
         case 4:
             _screen = Screen::CAMERA;
-            _cameraStatus = _camera.isReady() ? "Camera ready. Long press to capture."
-                                               : "Press to initialise camera.";
-            break;
+            _cameraStatus = "Initialising camera...";
+            render();
+            if (_camera.begin()) {
+                _cameraStatus = "Live preview | click to save";
+                updateCameraPreview();
+                _lastCameraPreview = millis();
+            } else {
+                _cameraStatus = "Camera init failed. Click to retry.";
+                render();
+            }
+            return;
         case 5: _screen = Screen::SYSTEM_INFO; break;
     }
     render();
+}
+
+void Application::updateCameraPreview() {
+    const uint16_t* pixels = nullptr;
+    uint16_t width = 0;
+    uint16_t height = 0;
+    if (_camera.getPreviewFrame(pixels, width, height)) {
+        _display.drawCameraPreview(pixels, width, height, "CLICK: SAVE  |  HOLD: EXIT");
+    } else {
+        _cameraStatus = "Preview frame unavailable";
+        _display.drawCamera(_cameraStatus);
+    }
+}
+
+void Application::captureCameraImage() {
+    if (!_camera.isReady()) {
+        _cameraStatus = _camera.begin()
+            ? "Camera ready; starting preview..."
+            : "Camera init failed. Check serial log.";
+        render();
+        return;
+    }
+
+    if (!_storage.isMounted() && !_storage.begin()) {
+        _cameraStatus = "SD unavailable - check card";
+        render();
+        return;
+    }
+
+    String savedPath;
+    if (_camera.captureAndSave(_storage, savedPath)) {
+        _cameraStatus = "Saved " + savedPath;
+        Serial.println("[CAM] Capture complete; preview continues");
+    } else {
+        _cameraStatus = "Capture failed - see serial log";
+    }
+    // Capture feedback is shown immediately; the live preview resumes on the
+    // next update tick without requiring another button press.
+    const uint16_t* pixels = nullptr;
+    uint16_t width = 0;
+    uint16_t height = 0;
+    if (_camera.getPreviewFrame(pixels, width, height)) {
+        _display.drawCameraPreview(pixels, width, height, _cameraStatus);
+    } else {
+        _display.drawCamera(_cameraStatus);
+    }
+    _lastCameraPreview = millis();
 }
 
 void Application::runSDAction(int action) {
@@ -311,7 +370,9 @@ void Application::render() {
             _display.drawList("DELETE SELECTED?", choices, _selectedItem, _pendingDeletePath);
             break;
         }
-        case Screen::CAMERA: _display.drawCamera(_cameraStatus); break;
+        case Screen::CAMERA:
+            if (!_camera.isReady()) _display.drawCamera(_cameraStatus);
+            break;
         case Screen::SYSTEM_INFO: _display.drawSystemInfo(); break;
         case Screen::MESSAGE: _display.drawMessage(_messageTitle, _messageBody); break;
     }
