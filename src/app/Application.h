@@ -18,7 +18,7 @@ public:
 private:
     enum class Screen {
         HOME, SD_TOOLBOX, SD_BROWSER, SD_INFO, SD_RESULT,
-        SD_FORMAT_CONFIRM, CAMERA, SYSTEM_INFO, MESSAGE
+        SD_FORMAT_CONFIRM, SD_DELETE_CONFIRM, CAMERA, SYSTEM_INFO, MESSAGE
     };
 
     TFTDisplay _display;
@@ -39,6 +39,7 @@ private:
     String _messageBody;
     String _resultTitle;
     String _resultBody;
+    String _pendingDeletePath;
     std::vector<StorageEntry> _directoryEntries;
 
     void render();
