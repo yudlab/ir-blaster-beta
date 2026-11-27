@@ -231,10 +231,10 @@ void Application::render() {
             labels.push_back(_currentPath == "/" ? "[ROOT] Open / status" : "[..] Parent directory");
             for (const StorageEntry& entry : _directoryEntries)
                 labels.push_back(String(entry.isDirectory ? "[DIR] " : "[FILE] ") + entry.name);
-            if (_directoryEntries.empty())
-                labels.push_back("(Empty directory)");
-            _display.drawList("FILE MANAGER", labels, _selectedItem,
-                String(_directoryEntries.size()) + " item(s)  " + _currentPath);
+            const String directoryStatus = _directoryEntries.empty()
+                ? "EMPTY  " + _currentPath
+                : String(_directoryEntries.size()) + " item(s)  " + _currentPath;
+            _display.drawList("FILE MANAGER", labels, _selectedItem, directoryStatus);
             break;
         }
         case Screen::SD_INFO: {
