@@ -18,7 +18,7 @@ public:
 private:
     enum class Screen {
         HOME, SD_TOOLBOX, SD_BROWSER, SD_INFO, SD_RESULT,
-        SD_FORMAT_CONFIRM, SD_DELETE_CONFIRM, CAMERA, SYSTEM_INFO, MESSAGE
+        SD_FORMAT_CONFIRM, SD_DELETE_CONFIRM, CAMERA, IMAGE_VIEWER, SYSTEM_INFO, MESSAGE
     };
 
     TFTDisplay _display;
@@ -35,6 +35,9 @@ private:
     uint32_t _buttonPressedAt = 0;
     String _currentPath = "/";
     String _cameraStatus = "Starting camera...";
+    String _viewingImagePath;
+    Screen _resultReturnScreen = Screen::SD_TOOLBOX;
+    int _resultReturnSelection = 0;
     String _messageTitle;
     String _messageBody;
     String _resultTitle;
@@ -45,6 +48,7 @@ private:
     void render();
     void updateCameraPreview();
     void captureCameraImage();
+    void openImageViewer(const String& path);
     void openHomeItem();
     void refreshDirectory();
     void openSelectedFile();
