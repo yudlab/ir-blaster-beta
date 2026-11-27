@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 #include <Adafruit_ST7789.h>
+#include <TJpg_Decoder.h>
+#include <FS.h>
 #include <vector>
 
 #include "config.h"
@@ -22,6 +24,9 @@ public:
 
 private:
     Adafruit_ST7789 _tft;
+    static TFTDisplay* _jpegTarget;
+    static bool jpegOutput(int16_t x, int16_t y, uint16_t width,
+                           uint16_t height, uint16_t* bitmap);
 
     void drawHeader(const String& title);
     void drawMenuItem(int y, const String& label, bool selected);
