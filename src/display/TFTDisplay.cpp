@@ -44,14 +44,16 @@ void TFTDisplay::drawHome(int selectedItem, const String& status) {
     _tft.fillScreen(ST77XX_BLACK);
     drawHeader("ESP IR BLASTER");
 
-    drawMenuItem(43, "IR Receiver", selectedItem == 0);
-    drawMenuItem(81, "IR Transmitter", selectedItem == 1);
-    drawMenuItem(119, "Trackball Test", selectedItem == 2);
-    drawMenuItem(157, "System Information", selectedItem == 3);
+    drawMenuItem(40, "IR Receiver", selectedItem == 0);
+    drawMenuItem(76, "IR Transmitter", selectedItem == 1);
+    drawMenuItem(112, "Trackball Test", selectedItem == 2);
+    drawMenuItem(148, "SD Card Explorer", selectedItem == 3);
+    drawMenuItem(184, "Camera", selectedItem == 4);
+    drawMenuItem(220, "System Information", selectedItem == 5);
 
-    drawText("SYSTEM", 10, 197, 2, ST77XX_YELLOW, ST77XX_BLACK);
-    drawText(status, 10, 220, 1, ST77XX_RED, ST77XX_BLACK);
-    drawText("Move: navigate  Press: select", 10, 245, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText(status, 8, 265, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText("Short: next   Long: select", 8, 284, 1,
+             ST77XX_WHITE, ST77XX_BLACK);
 }
 
 void TFTDisplay::drawList(const String& title,
@@ -86,7 +88,7 @@ void TFTDisplay::drawList(const String& title,
     drawText(footer, 8, 260, 1, ST77XX_GREEN, ST77XX_BLACK);
 
     drawText(
-        "Press: open  Back: return",
+        "Short: next   Long: open",
         8, 281, 1, ST77XX_WHITE, ST77XX_BLACK
     );
 }
@@ -107,12 +109,12 @@ void TFTDisplay::drawCamera(const String& status) {
     );
 
     drawText(
-        "Press: capture JPEG",
+        "Long: capture JPEG",
         12, 220, 1, ST77XX_GREEN, ST77XX_BLACK
     );
 
     drawText(
-        "Back: main menu",
+        "Long: return to menu",
         12, 240, 1, ST77XX_WHITE, ST77XX_BLACK
     );
 }
@@ -121,7 +123,7 @@ void TFTDisplay::drawMessage(const String& title, const String& message) {
     _tft.fillScreen(ST77XX_BLACK);
     drawHeader(title);
     drawText(message, 12, 70, 2, ST77XX_YELLOW, ST77XX_BLACK);
-    drawText("Press to return", 12, 220, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText("Long press to return", 12, 220, 1, ST77XX_GREEN, ST77XX_BLACK);
 }
 
 void TFTDisplay::drawSystemInfo() {
@@ -136,5 +138,5 @@ void TFTDisplay::drawSystemInfo() {
              8, 134, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText("Camera: OV2640", 8, 162, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText("SD: SD_MMC 1-bit", 8, 190, 1, ST77XX_WHITE, ST77XX_BLACK);
-    drawText("Press to return", 8, 225, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText("Long press to return", 8, 225, 1, ST77XX_GREEN, ST77XX_BLACK);
 }
