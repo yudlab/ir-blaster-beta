@@ -10,8 +10,6 @@ namespace BoardConfig {
     constexpr uint32_t SERIAL_BAUD = 115200;
 }
 
-// Default panel: ST7789, 240x320. Pin map follows the carrier TFT header.
-// GPIO0 is TFT reset and an ESP32-S3 strapping pin.
 namespace DisplayConfig {
     constexpr int WIDTH = 240;
     constexpr int HEIGHT = 320;
@@ -23,6 +21,33 @@ namespace DisplayConfig {
     constexpr int PIN_RESET = 0;
     constexpr int PIN_BACKLIGHT = -1;
     constexpr bool BACKLIGHT_ACTIVE_HIGH = true;
+}
+
+// GOOUUU onboard microSD slot: SD_MMC, 1-bit mode.
+namespace SDConfig {
+    constexpr int PIN_CMD = 38;
+    constexpr int PIN_CLK = 39;
+    constexpr int PIN_D0 = 40;
+    constexpr char MOUNT_POINT[] = "/sdcard";
+}
+
+namespace CameraConfig {
+    constexpr int PIN_SIOD = 4;
+    constexpr int PIN_SIOC = 5;
+    constexpr int PIN_VSYNC = 6;
+    constexpr int PIN_HREF = 7;
+    constexpr int PIN_Y2 = 11;
+    constexpr int PIN_Y3 = 9;
+    constexpr int PIN_Y4 = 8;
+    constexpr int PIN_Y5 = 10;
+    constexpr int PIN_Y6 = 12;
+    constexpr int PIN_Y7 = 18;
+    constexpr int PIN_Y8 = 17;
+    constexpr int PIN_Y9 = 16;
+    constexpr int PIN_PCLK = 13;
+    constexpr int PIN_XCLK = 15;
+    constexpr int PIN_PWDN = -1;
+    constexpr int PIN_RESET = -1;
 }
 
 namespace ReservedPins {
