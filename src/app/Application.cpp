@@ -59,7 +59,7 @@ void Application::update() {
             Serial.println("[BTN] BOOT pressed");
         } else {
             const uint32_t duration = eventTime - _buttonPressedAt;
-            Serial.printf("[BTN] BOOT released after %lu ms\\n",
+            Serial.printf("[BTN] BOOT released after %lu ms\n",
                           static_cast<unsigned long>(duration));
             if (_screen == Screen::CAMERA) {
                 if (duration >= InputConfig::LONG_PRESS_MS) back();
