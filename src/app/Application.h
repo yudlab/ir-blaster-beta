@@ -28,6 +28,12 @@ private:
     int _selectedItem = 0;
     int _selectedFile = 0;
     uint32_t _lastRefresh = 0;
+
+    // Debounced onboard BOOT button state (active LOW).
+    bool _buttonLastReading = true;
+    bool _buttonStableState = true;
+    uint32_t _buttonLastChange = 0;
+    uint32_t _buttonPressedAt = 0;
     String _currentPath = "/";
     String _cameraStatus = "Press to initialise camera";
     String _messageTitle;
