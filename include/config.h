@@ -29,6 +29,7 @@ namespace InputConfig {
     constexpr int PIN_BOOT = 0;
     constexpr uint32_t DEBOUNCE_MS = 35;
     constexpr uint32_t LONG_PRESS_MS = 600;
+    constexpr uint32_t VERY_LONG_PRESS_MS = 1800;
 }
 
 // GOOUUU onboard microSD slot: SD_MMC, 1-bit mode.
