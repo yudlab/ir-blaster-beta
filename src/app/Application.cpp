@@ -1,29 +1,66 @@
 #include "Application.h"
 
+#include "driver/gpio.h"
+#include "esp_timer.h"
+
+namespace {
+constexpr uint8_t BUTTON_QUEUE_SIZE = 16;
+volatile uint8_t buttonQueueHead = 0;
+volatile uint8_t buttonQueueTail = 0;
+volatile uint32_t buttonQueueTimes[BUTTON_QUEUE_SIZE] = {};
+volatile bool buttonQueueStates[BUTTON_QUEUE_SIZE] = {};
+volatile bool buttonQueueOverflow = false;
+
+void IRAM_ATTR onBootButtonEdge() {
+    const uint8_t head = buttonQueueHead;
+    const uint8_t next = static_cast<uint8_t>((head + 1) % BUTTON_QUEUE_SIZE);
+    if (next == buttonQueueTail) {
+        buttonQueueOverflow = true;
+        return;
+    }
+
+    buttonQueueTimes[head] = static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
+    buttonQueueStates[head] = gpio_get_level(static_cast<gpio_num_t>(InputConfig::PIN_BOOT)) != 0;
+    buttonQueueHead = next;
+}
+}
+
 void Application::begin() {
     pinMode(InputConfig::PIN_BOOT, INPUT_PULLUP);
-    _buttonLastReading = digitalRead(InputConfig::PIN_BOOT);
-    _buttonStableState = _buttonLastReading;
-    _buttonLastChange = millis();
-    _buttonPressedAt = millis();
+    _buttonStableState = digitalRead(InputConfig::PIN_BOOT);
+    _buttonLastAcceptedChange = millis();
+    buttonQueueHead = 0;
+    buttonQueueTail = 0;
+    buttonQueueOverflow = false;
+    attachInterrupt(digitalPinToInterrupt(InputConfig::PIN_BOOT), onBootButtonEdge, CHANGE);
     _display.begin();
     _storage.begin();
     render();
 }
 
 void Application::update() {
-    const uint32_t now = millis();
-    const bool reading = digitalRead(InputConfig::PIN_BOOT);
-    if (reading != _buttonLastReading) {
-        _buttonLastReading = reading;
-        _buttonLastChange = now;
-    }
-    if ((now - _buttonLastChange) >= InputConfig::DEBOUNCE_MS &&
-        reading != _buttonStableState) {
+    // Button edges are captured by an ISR, so short presses are not lost while
+    // camera capture/preview or TFT rendering temporarily blocks this loop.
+    while (buttonQueueTail != buttonQueueHead) {
+        const uint8_t tail = buttonQueueTail;
+        const uint32_t eventTime = buttonQueueTimes[tail];
+        const bool reading = buttonQueueStates[tail];
+        buttonQueueTail = static_cast<uint8_t>((tail + 1) % BUTTON_QUEUE_SIZE);
+
+        if (reading == _buttonStableState ||
+            (eventTime - _buttonLastAcceptedChange) < InputConfig::DEBOUNCE_MS) {
+            continue;
+        }
+
         _buttonStableState = reading;
-        if (reading == LOW) _buttonPressedAt = now;
-        else {
-            const uint32_t duration = now - _buttonPressedAt;
+        _buttonLastAcceptedChange = eventTime;
+        if (reading == LOW) {
+            _buttonPressedAt = eventTime;
+            Serial.println("[BTN] BOOT pressed");
+        } else {
+            const uint32_t duration = eventTime - _buttonPressedAt;
+            Serial.printf("[BTN] BOOT released after %lu ms\\n",
+                          static_cast<unsigned long>(duration));
             if (_screen == Screen::CAMERA) {
                 if (duration >= InputConfig::LONG_PRESS_MS) back();
                 else captureCameraImage();
@@ -31,6 +68,11 @@ void Application::update() {
             else if (duration >= InputConfig::LONG_PRESS_MS) select();
             else moveSelection(1);
         }
+    }
+
+    if (buttonQueueOverflow) {
+        buttonQueueOverflow = false;
+        Serial.println("[BTN] Warning: button event queue overflowed");
     }
 
     while (Serial.available()) {
