@@ -91,8 +91,8 @@ bool CameraService::getPreviewFrame(const uint16_t*& pixels,
     }
 
     const bool converted = frame->format == PIXFORMAT_JPEG &&
-        fmt2rgb565(frame->buf, frame->len,
-                   reinterpret_cast<uint8_t*>(_previewBuffer), true);
+        jpg2rgb565(frame->buf, frame->len,
+                   reinterpret_cast<uint8_t*>(_previewBuffer), JPG_SCALE_NONE);
     esp_camera_fb_return(frame);
 
     if (!converted) {
