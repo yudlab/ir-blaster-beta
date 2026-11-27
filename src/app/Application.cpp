@@ -1,14 +1,46 @@
 #include "Application.h"
 
 void Application::begin() {
+    pinMode(InputConfig::PIN_BOOT, INPUT_PULLUP);
+    _buttonLastReading = digitalRead(InputConfig::PIN_BOOT);
+    _buttonStableState = _buttonLastReading;
+    _buttonLastChange = millis();
+    _buttonPressedAt = millis();
+
     _display.begin();
     _storage.begin();
     render();
 }
 
 void Application::update() {
-    // Serial navigation is a convenient bring-up fallback until the trackball
-    // driver is connected: W/S = move, E = select, B = back.
+    // BOOT button: short press advances; long press selects.
+    // Actions occur on release so holding the button cannot repeat them.
+    const uint32_t now = millis();
+    const bool reading = digitalRead(InputConfig::PIN_BOOT);
+
+    if (reading != _buttonLastReading) {
+        _buttonLastReading = reading;
+        _buttonLastChange = now;
+    }
+
+    if ((now - _buttonLastChange) >= InputConfig::DEBOUNCE_MS &&
+        reading != _buttonStableState) {
+        _buttonStableState = reading;
+
+        if (reading == LOW) {
+            _buttonPressedAt = now;
+        } else {
+            const uint32_t pressDuration = now - _buttonPressedAt;
+            if (pressDuration >= InputConfig::LONG_PRESS_MS) {
+                select();
+            } else {
+                moveSelection(1);
+            }
+        }
+    }
+
+    // Serial navigation remains available for debugging:
+    // W = previous, S = next, E = select, B = back.
     while (Serial.available()) {
         const char key = static_cast<char>(Serial.read());
         if (key == 'w' || key == 'W') moveSelection(-1);
