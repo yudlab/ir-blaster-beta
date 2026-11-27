@@ -113,10 +113,11 @@ bool TFTDisplay::drawJpegFromFS(fs::FS& filesystem, const String& path) {
     _jpegTarget = nullptr;
     if (decodeResult != JDR_OK) return false;
 
-    _tft.setRotation(0);
-    _tft.fillRect(0, 292, DisplayConfig::WIDTH, 28, ST77XX_BLACK);
+    // Keep the panel in landscape rotation; show the control hint in a
+    // narrow overlay at the bottom of the 320x240 image.
+    _tft.fillRect(0, 220, 320, 20, ST77XX_BLACK);
     _tft.setTextWrap(false);
-    drawText("Long press: back", 8, 301, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText("Hold BOOT: back", 4, 226, 1, ST77XX_GREEN, ST77XX_BLACK);
     _tft.setTextWrap(true);
     return true;
 }
