@@ -29,12 +29,13 @@ private:
     int _selectedItem = 0;
     int _selectedFile = 0;
     uint32_t _lastRefresh = 0;
+    uint32_t _lastCameraPreview = 0;
     bool _buttonLastReading = true;
     bool _buttonStableState = true;
     uint32_t _buttonLastChange = 0;
     uint32_t _buttonPressedAt = 0;
     String _currentPath = "/";
-    String _cameraStatus = "Press to initialise camera";
+    String _cameraStatus = "Starting camera...";
     String _messageTitle;
     String _messageBody;
     String _resultTitle;
@@ -43,6 +44,8 @@ private:
     std::vector<StorageEntry> _directoryEntries;
 
     void render();
+    void updateCameraPreview();
+    void captureCameraImage();
     void openHomeItem();
     void refreshDirectory();
     void openSelectedFile();
