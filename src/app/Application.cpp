@@ -64,6 +64,8 @@ void Application::update() {
             if (_screen == Screen::CAMERA) {
                 if (duration >= InputConfig::LONG_PRESS_MS) back();
                 else captureCameraImage();
+            } else if (_screen == Screen::IMAGE_VIEWER) {
+                if (duration >= InputConfig::LONG_PRESS_MS) back();
             } else if (duration >= InputConfig::VERY_LONG_PRESS_MS) back();
             else if (duration >= InputConfig::LONG_PRESS_MS) select();
             else moveSelection(1);
@@ -131,9 +133,15 @@ void Application::select() {
         return;
     }
     if (_screen == Screen::CAMERA) { captureCameraImage(); return; }
+    if (_screen == Screen::IMAGE_VIEWER) { back(); return; }
     if (_screen == Screen::SD_RESULT || _screen == Screen::SD_INFO ||
         _screen == Screen::SYSTEM_INFO || _screen == Screen::MESSAGE) {
-        if (_screen == Screen::SD_RESULT || _screen == Screen::SD_INFO) {
+        if (_screen == Screen::SD_RESULT) {
+            _screen = _resultReturnScreen;
+            _selectedItem = _resultReturnSelection;
+            if (_screen == Screen::SD_BROWSER) refreshDirectory();
+            render();
+        } else if (_screen == Screen::SD_INFO) {
             _screen = Screen::SD_TOOLBOX;
             _selectedItem = 0;
             render();
@@ -147,6 +155,12 @@ void Application::back() {
         returnHome();
         return;
     }
+    if (_screen == Screen::IMAGE_VIEWER) {
+        _screen = Screen::SD_BROWSER;
+        refreshDirectory();
+        render();
+        return;
+    }
     if (_screen == Screen::SD_BROWSER && _currentPath != "/") {
         const int slash = _currentPath.lastIndexOf('/');
         _currentPath = slash <= 0 ? "/" : _currentPath.substring(0, slash);
@@ -156,8 +170,7 @@ void Application::back() {
         return;
     }
     if (_screen == Screen::SD_BROWSER || _screen == Screen::SD_INFO ||
-        _screen == Screen::SD_RESULT || _screen == Screen::SD_FORMAT_CONFIRM ||
-        _screen == Screen::SD_DELETE_CONFIRM) {
+        _screen == Screen::SD_FORMAT_CONFIRM || _screen == Screen::SD_DELETE_CONFIRM) {
         _screen = Screen::SD_TOOLBOX;
         _selectedItem = 0;
         render();
@@ -344,7 +357,15 @@ void Application::openSelectedFile() {
     showResult(entry.name, String("File size: ") + String(entry.size) + " bytes\nPath: " + entry.path);
 }
 
+void Application::openImageViewer(const String& path) {
+    _viewingImagePath = path;
+    _screen = Screen::IMAGE_VIEWER;
+    render();
+}
+
 void Application::showResult(const String& title, const String& body) {
+    _resultReturnScreen = _screen;
+    _resultReturnSelection = _selectedItem;
     _resultTitle = title;
     _resultBody = body;
     _screen = Screen::SD_RESULT;
@@ -414,6 +435,11 @@ void Application::render() {
         }
         case Screen::CAMERA:
             if (!_camera.isReady()) _display.drawCamera(_cameraStatus);
+            break;
+        case Screen::IMAGE_VIEWER:
+            if (!_display.drawJpegFromFS(SD_MMC, _viewingImagePath)) {
+                _display.drawMessage("IMAGE ERROR", "Could not decode JPEG.\\nLong press to return.");
+            }
             break;
         case Screen::SYSTEM_INFO: _display.drawSystemInfo(); break;
         case Screen::MESSAGE: _display.drawMessage(_messageTitle, _messageBody); break;
