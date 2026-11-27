@@ -354,6 +354,12 @@ void Application::openSelectedFile() {
         render();
         return;
     }
+    String lowerName = entry.name;
+    lowerName.toLowerCase();
+    if (lowerName.endsWith(".jpg") || lowerName.endsWith(".jpeg")) {
+        openImageViewer(entry.path);
+        return;
+    }
     showResult(entry.name, String("File size: ") + String(entry.size) + " bytes\nPath: " + entry.path);
 }
 
