@@ -88,7 +88,7 @@ void TFTDisplay::drawList(const String& title,
     drawText(footer, 8, 260, 1, ST77XX_GREEN, ST77XX_BLACK);
 
     drawText(
-        "Short: next   Long: open",
+        "Short: next  Long: open  Hold: back",
         8, 281, 1, ST77XX_WHITE, ST77XX_BLACK
     );
 }
@@ -114,7 +114,7 @@ void TFTDisplay::drawCamera(const String& status) {
     );
 
     drawText(
-        "Long: return to menu",
+        "Hold 2s: back to menu",
         12, 240, 1, ST77XX_WHITE, ST77XX_BLACK
     );
 }
