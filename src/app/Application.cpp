@@ -163,7 +163,7 @@ void Application::runSDAction(int action) {
         showResult("SD SPEED TEST",
             String("Write: ") + String(writeRate, 2) + " MB/s\nRead: " +
             String(readRate, 2) + " MB/s\nVerify: " +
-            (r.dataVerified ? "PASS" : "FAIL"));
+            (r.success ? "PASS" : "FAIL"));
     } else if (action == 3) {
         String report;
         const bool ok = _storage.runCardTest(report);
@@ -277,8 +277,8 @@ void Application::render() {
             for (const StorageEntry& entry : _directoryEntries)
                 labels.push_back(String(entry.isDirectory ? "[DIR] " : "[FILE] ") + entry.name);
             labels.push_back("[+] Create folder");
-            labels.push_back("[-] Delete last item");
-            labels.push_back("[R] Rename last item");
+            labels.push_back("[-] Delete last listed item");
+            labels.push_back("[R] Rename last listed item");
             const String directoryStatus = _directoryEntries.empty()
                 ? "EMPTY  " + _currentPath
                 : String(_directoryEntries.size()) + " item(s)  " + _currentPath;
