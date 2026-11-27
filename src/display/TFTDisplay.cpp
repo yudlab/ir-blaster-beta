@@ -2,6 +2,8 @@
 
 #include <SPI.h>
 
+TFTDisplay* TFTDisplay::_jpegTarget = nullptr;
+
 TFTDisplay::TFTDisplay()
     : _tft(&SPI, DisplayConfig::PIN_CS, DisplayConfig::PIN_DC,
            DisplayConfig::PIN_RESET) {}
@@ -91,6 +93,32 @@ void TFTDisplay::drawCameraPreview(const uint16_t* pixels, uint16_t width,
     _tft.setTextWrap(false);
     drawText(status, 4, 226, 1, ST77XX_WHITE, ST77XX_BLACK);
     _tft.setTextWrap(true);
+}
+
+bool TFTDisplay::jpegOutput(int16_t x, int16_t y, uint16_t width,
+                            uint16_t height, uint16_t* bitmap) {
+    if (!_jpegTarget || !bitmap) return false;
+    _jpegTarget->_tft.drawRGBBitmap(x, y, bitmap, width, height);
+    return true;
+}
+
+bool TFTDisplay::drawJpegFromFS(fs::FS& filesystem, const String& path) {
+    _tft.setRotation(1);
+    _tft.fillScreen(ST77XX_BLACK);
+    _jpegTarget = this;
+    TJpg_Decoder.setJpgScale(1);
+    TJpg_Decoder.setSwapBytes(false);
+    TJpg_Decoder.setCallback(jpegOutput);
+    const uint16_t imageWidth = TJpg_Decoder.drawFsJpg(0, 0, filesystem, path.c_str());
+    _jpegTarget = nullptr;
+    if (imageWidth == 0) return false;
+
+    _tft.setRotation(0);
+    _tft.fillRect(0, 292, DisplayConfig::WIDTH, 28, ST77XX_BLACK);
+    _tft.setTextWrap(false);
+    drawText("Long press: back", 8, 301, 1, ST77XX_GREEN, ST77XX_BLACK);
+    _tft.setTextWrap(true);
+    return true;
 }
 
 void TFTDisplay::drawMessage(const String& title, const String& message) {
