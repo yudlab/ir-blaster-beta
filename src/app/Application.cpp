@@ -31,7 +31,9 @@ void Application::update() {
             _buttonPressedAt = now;
         } else {
             const uint32_t pressDuration = now - _buttonPressedAt;
-            if (pressDuration >= InputConfig::LONG_PRESS_MS) {
+            if (pressDuration >= InputConfig::VERY_LONG_PRESS_MS) {
+                back();
+            } else if (pressDuration >= InputConfig::LONG_PRESS_MS) {
                 select();
             } else {
                 moveSelection(1);
