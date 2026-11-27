@@ -30,9 +30,8 @@ private:
     int _selectedFile = 0;
     uint32_t _lastRefresh = 0;
     uint32_t _lastCameraPreview = 0;
-    bool _buttonLastReading = true;
     bool _buttonStableState = true;
-    uint32_t _buttonLastChange = 0;
+    uint32_t _buttonLastAcceptedChange = 0;
     uint32_t _buttonPressedAt = 0;
     String _currentPath = "/";
     String _cameraStatus = "Starting camera...";
