@@ -292,7 +292,7 @@ bool StorageManager::formatCard(String& report) {
         report = String("Format failed: FatFs ") +
                  String(static_cast<int>(formatResult));
         if (!remounted) report += " / remount failed";
-        Serial.printf("[SD] FAT32 format failed: FatFs=%d, remount=%s\\n",
+        Serial.printf("[SD] FAT32 format failed: FatFs=%d, remount=%s\n",
             static_cast<int>(formatResult), remounted ? "OK" : "FAILED");
         return false;
     }
@@ -316,7 +316,7 @@ bool StorageManager::formatCard(String& report) {
     }
 
     report = "FAT32 format complete";
-    Serial.printf("[SD] FAT32 format and remount verified (%llu MB)\\n",
+    Serial.printf("[SD] FAT32 format and remount verified (%llu MB)\n",
         totalBytes() / (1024ULL * 1024ULL));
     return true;
 }
