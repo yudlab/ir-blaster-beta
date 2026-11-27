@@ -158,7 +158,7 @@ void Application::updateCameraPreview() {
     uint16_t width = 0;
     uint16_t height = 0;
     if (_camera.getPreviewFrame(pixels, width, height)) {
-        _display.drawCameraPreview(pixels, width, height, "CLICK: SAVE  |  HOLD: EXIT");
+        _display.drawCameraPreview(pixels, width, height, _cameraStatus);
     } else {
         _cameraStatus = "Preview frame unavailable";
         _display.drawCamera(_cameraStatus);
