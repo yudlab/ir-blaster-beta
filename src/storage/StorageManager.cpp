@@ -265,41 +265,58 @@ bool StorageManager::formatCard(String& report) {
         return false;
     }
 
-    // FatFs formatting operates on the mounted SDMMC block device. Unmount the
-    // logical FAT volume first, format drive 0:, then remount through SD_MMC.
+    // FatFs permits formatting a logical drive whether or not it is mounted.
+    // Keep the SD_MMC disk-I/O driver registered while f_mkfs writes the new
+    // partition table and FAT32 filesystem. SD_MMC.end() then performs the
+    // normal VFS/FatFs unmount before begin() rebuilds the mount cleanly.
     BYTE* work = static_cast<BYTE*>(malloc(FF_MAX_SS));
     if (!work) {
         report = "Not enough RAM to format";
         return false;
     }
 
-    const MKFS_PARM options = { static_cast<BYTE>(FM_FAT), 0, 0, 0, 0 };
-    const FRESULT unmountResult = f_mount(nullptr, "0:", 0);
-    if (unmountResult != FR_OK) {
-        free(work);
-        report = "Could not unmount FAT volume";
-        return false;
-    }
-
+    // Force FAT32. FM_FAT alone requests FAT12/16 and can fail on larger SDHC
+    // and SDXC cards.
+    const MKFS_PARM options = { static_cast<BYTE>(FM_FAT32), 0, 0, 0, 0 };
     const FRESULT formatResult = f_mkfs("0:", &options, work, FF_MAX_SS);
     free(work);
 
-    // SD_MMC owns the VFS registration and card handle; end it before
-    // mounting again so its internal state is rebuilt consistently.
+    // Always close and reopen the SD_MMC mount, including after a format error,
+    // so the filesystem driver does not retain stale FAT metadata.
     SD_MMC.end();
     _mounted = false;
-    delay(100);
+    delay(150);
     const bool remounted = begin();
 
-    if (formatResult != FR_OK || !remounted) {
-        report = String("Format/remount failed (FatFs ") +
-                 String(static_cast<int>(formatResult)) + ")";
-        Serial.printf("[SD] Format failed: FatFs result %d, remount=%s\n",
-            static_cast<int>(formatResult), remounted ? "yes" : "no");
+    if (formatResult != FR_OK) {
+        report = String("Format failed: FatFs ") +
+                 String(static_cast<int>(formatResult));
+        if (!remounted) report += " / remount failed";
+        Serial.printf("[SD] FAT32 format failed: FatFs=%d, remount=%s\\n",
+            static_cast<int>(formatResult), remounted ? "OK" : "FAILED");
         return false;
     }
 
-    report = "FAT format complete";
-    Serial.println("[SD] FAT format completed and card remounted");
+    if (!remounted) {
+        report = "FAT32 formatted, but SD remount failed";
+        Serial.println("[SD] FAT32 format succeeded, but remount failed");
+        return false;
+    }
+
+    // Verify that the newly mounted volume is usable, not merely that begin()
+    // returned true.
+    File root = SD_MMC.open("/");
+    const bool verified = root && root.isDirectory();
+    if (root) root.close();
+
+    if (!verified) {
+        report = "FAT32 formatted; filesystem verification failed";
+        Serial.println("[SD] FAT32 format completed but root verification failed");
+        return false;
+    }
+
+    report = "FAT32 format complete";
+    Serial.printf("[SD] FAT32 format and remount verified (%llu MB)\\n",
+        totalBytes() / (1024ULL * 1024ULL));
     return true;
 }
