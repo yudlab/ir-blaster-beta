@@ -18,9 +18,17 @@ namespace DisplayConfig {
     constexpr int PIN_MISO = -1;
     constexpr int PIN_CS = 47;
     constexpr int PIN_DC = 45;
-    constexpr int PIN_RESET = 0;
+    // Hardware reset is tied high externally; use the controller's software reset.
+    constexpr int PIN_RESET = -1;
     constexpr int PIN_BACKLIGHT = -1;
     constexpr bool BACKLIGHT_ACTIVE_HIGH = true;
+}
+
+// Onboard BOOT button (active LOW, with internal pull-up).
+namespace InputConfig {
+    constexpr int PIN_BOOT = 0;
+    constexpr uint32_t DEBOUNCE_MS = 35;
+    constexpr uint32_t LONG_PRESS_MS = 600;
 }
 
 // GOOUUU onboard microSD slot: SD_MMC, 1-bit mode.
