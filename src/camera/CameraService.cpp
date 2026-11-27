@@ -90,10 +90,66 @@ bool CameraService::getPreviewFrame(const uint16_t*& pixels,
         return false;
     }
 
-    const bool converted = frame->format == PIXFORMAT_JPEG &&
-        jpg2rgb565(frame->buf, frame->len,
-                   reinterpret_cast<uint8_t*>(_previewBuffer), JPG_SCALE_NONE);
+    Serial.printf(
+    "[CAM] Frame pointer: %p | Buffer: %p | Length: %u | Format: %d | Size: %ux%u\n",
+    frame,
+    frame->buf,
+    static_cast<unsigned>(frame->len),
+    frame->format,
+    frame->width,
+    frame->height
+);
+
+if (!frame->buf || frame->len < 4) {
+    Serial.println("[CAM] ERROR: Invalid or empty JPEG buffer");
     esp_camera_fb_return(frame);
+    return false;
+}
+
+Serial.printf(
+    "[CAM] JPEG header: %02X %02X %02X %02X\n",
+    frame->buf[0],
+    frame->buf[1],
+    frame->buf[2],
+    frame->buf[3]
+);
+
+if (frame->buf[0] != 0xFF || frame->buf[1] != 0xD8) {
+    Serial.println("[CAM] ERROR: Invalid JPEG SOI marker");
+    esp_camera_fb_return(frame);
+    return false;
+}
+
+Serial.println();
+Serial.println("========== CAMERA FRAME DIAGNOSTICS ==========");
+
+Serial.printf("Frame pointer: %p\n", frame);
+Serial.printf("Buffer pointer: %p\n", frame->buf);
+Serial.printf("Buffer length: %u\n", static_cast<unsigned>(frame->len));
+Serial.printf("Pixel format: %d\n", frame->format);
+Serial.printf("Frame dimensions: %ux%u\n", frame->width, frame->height);
+
+if (frame->buf && frame->len >= 4) {
+    Serial.printf(
+        "JPEG header: %02X %02X %02X %02X\n",
+        frame->buf[0],
+        frame->buf[1],
+        frame->buf[2],
+        frame->buf[3]
+    );
+}
+
+Serial.println("===============================================");
+Serial.flush();
+delay(100);
+
+const bool converted = frame->format == PIXFORMAT_JPEG &&
+    jpg2rgb565(
+        frame->buf,
+        frame->len,
+        reinterpret_cast<uint8_t*>(_previewBuffer),
+        JPG_SCALE_NONE
+    );
 
     if (!converted) {
         Serial.println("[CAM] JPEG-to-RGB565 preview conversion failed");
