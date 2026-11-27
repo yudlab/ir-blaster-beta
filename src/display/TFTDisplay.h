@@ -17,6 +17,8 @@ public:
     void drawList(const String& title, const std::vector<String>& items,
                   int selectedItem, const String& footer);
     void drawCamera(const String& status);
+    void drawCameraPreview(const uint16_t* pixels, uint16_t width,
+                           uint16_t height, const String& status);
 
 private:
     Adafruit_ST7789 _tft;
