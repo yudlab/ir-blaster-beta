@@ -45,8 +45,8 @@ void Application::moveSelection(int direction) {
     switch (_screen) {
         case Screen::HOME: count = 6; break;
         case Screen::SD_TOOLBOX: count = 6; break;
-        case Screen::SD_BROWSER: count = static_cast<int>(_directoryEntries.size()) + 1; break;
-        case Screen::SD_FORMAT_CONFIRM: count = 2; break;
+        case Screen::SD_BROWSER: count = static_cast<int>(_directoryEntries.size()) + 4; break;
+        case Screen::SD_FORMAT_CONFIRM: case Screen::SD_DELETE_CONFIRM: count = 2; break;
         default: return;
     }
     _selectedItem = (_selectedItem + direction + count) % count;
@@ -58,6 +58,12 @@ void Application::select() {
     if (_screen == Screen::HOME) { openHomeItem(); return; }
     if (_screen == Screen::SD_TOOLBOX) { runSDAction(_selectedItem); return; }
     if (_screen == Screen::SD_BROWSER) { _selectedFile = _selectedItem; openSelectedFile(); return; }
+    if (_screen == Screen::SD_DELETE_CONFIRM) {
+        if (_selectedItem == 1 && _storage.remove(_pendingDeletePath))
+            showResult("FILE DELETED", _pendingDeletePath);
+        else showResult("DELETE CANCELLED", "No file was deleted.");
+        return;
+    }
     if (_screen == Screen::SD_FORMAT_CONFIRM) {
         if (_selectedItem == 1) {
             String report;
@@ -104,7 +110,8 @@ void Application::back() {
         return;
     }
     if (_screen == Screen::SD_BROWSER || _screen == Screen::SD_INFO ||
-        _screen == Screen::SD_RESULT || _screen == Screen::SD_FORMAT_CONFIRM) {
+        _screen == Screen::SD_RESULT || _screen == Screen::SD_FORMAT_CONFIRM ||
+        _screen == Screen::SD_DELETE_CONFIRM) {
         _screen = Screen::SD_TOOLBOX;
         _selectedItem = 0;
         render();
@@ -180,11 +187,49 @@ void Application::refreshDirectory() {
 }
 
 void Application::openSelectedFile() {
+    const int fileCount = static_cast<int>(_directoryEntries.size());
     if (_selectedFile == 0) {
         if (_currentPath != "/") back();
         else showResult("SD ROOT", _directoryEntries.empty()
             ? "Card is mounted. The root folder is empty."
-            : String(_directoryEntries.size()) + " item(s) in root.");
+            : String(fileCount) + " item(s) in root.");
+        return;
+    }
+    if (_selectedFile == fileCount + 1) {
+        String folder = _currentPath == "/" ? "/NewFolder" : _currentPath + "/NewFolder";
+        int suffix = 2;
+        while (_storage.exists(folder)) {
+            folder = (_currentPath == "/" ? "/" : _currentPath + "/") + "NewFolder_" + String(suffix++);
+        }
+        const bool ok = _storage.createDirectory(folder);
+        refreshDirectory();
+        showResult(ok ? "FOLDER CREATED" : "CREATE FAILED", folder);
+        return;
+    }
+    if (_selectedFile == fileCount + 2) {
+        if (fileCount == 0) { showResult("NOTHING TO DELETE", "This directory has no files."); return; }
+        _pendingDeletePath = _directoryEntries[fileCount - 1].path;
+        _screen = Screen::SD_DELETE_CONFIRM;
+        _selectedItem = 0;
+        render();
+        return;
+    }
+    if (_selectedFile == fileCount + 3) {
+        if (fileCount == 0) { showResult("NOTHING TO RENAME", "This directory has no files."); return; }
+        const StorageEntry& target = _directoryEntries[fileCount - 1];
+        const int dot = target.name.lastIndexOf('.');
+        const String base = dot > 0 ? target.name.substring(0, dot) : target.name;
+        const String ext = dot > 0 ? target.name.substring(dot) : "";
+        String renamed = base + "_renamed" + ext;
+        String destination = _currentPath == "/" ? "/" + renamed : _currentPath + "/" + renamed;
+        int suffix = 2;
+        while (_storage.exists(destination)) {
+            renamed = base + "_renamed_" + String(suffix++) + ext;
+            destination = _currentPath == "/" ? "/" + renamed : _currentPath + "/" + renamed;
+        }
+        const bool ok = _storage.rename(target.path, destination);
+        refreshDirectory();
+        showResult(ok ? "FILE RENAMED" : "RENAME FAILED", destination);
         return;
     }
     const StorageEntry& entry = _directoryEntries[_selectedFile - 1];
@@ -231,6 +276,9 @@ void Application::render() {
             labels.push_back(_currentPath == "/" ? "[ROOT] Open / status" : "[..] Parent directory");
             for (const StorageEntry& entry : _directoryEntries)
                 labels.push_back(String(entry.isDirectory ? "[DIR] " : "[FILE] ") + entry.name);
+            labels.push_back("[+] Create folder");
+            labels.push_back("[-] Delete last item");
+            labels.push_back("[R] Rename last item");
             const String directoryStatus = _directoryEntries.empty()
                 ? "EMPTY  " + _currentPath
                 : String(_directoryEntries.size()) + " item(s)  " + _currentPath;
@@ -256,6 +304,11 @@ void Application::render() {
             const std::vector<String> choices = {"Cancel", "YES - FORMAT CARD"};
             _display.drawList("ERASE ALL DATA?", choices, _selectedItem,
                 "Formatting deletes every file");
+            break;
+        }
+        case Screen::SD_DELETE_CONFIRM: {
+            const std::vector<String> choices = {"Cancel", "YES - DELETE"};
+            _display.drawList("DELETE SELECTED?", choices, _selectedItem, _pendingDeletePath);
             break;
         }
         case Screen::CAMERA: _display.drawCamera(_cameraStatus); break;
