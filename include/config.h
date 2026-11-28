@@ -28,8 +28,8 @@ namespace DisplayConfig {
 namespace InputConfig {
     constexpr int PIN_BOOT = 0;
     constexpr uint32_t DEBOUNCE_MS = 35;
-    constexpr uint32_t LONG_PRESS_MS = 600;
-    constexpr uint32_t VERY_LONG_PRESS_MS = 1800;
+    constexpr uint32_t DOUBLE_PRESS_WINDOW_MS = 1000;
+    constexpr uint32_t HOLD_TO_HOME_MS = 800;
 }
 
 // I2C bus reserved for automatic SX1509 detection.
