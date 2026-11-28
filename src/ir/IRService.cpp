@@ -191,7 +191,16 @@ bool IRService::copyButton(const String& sourceRemote, const String& sourceButto
 }
 
 
-void IRService::beginScreenLearn() {
+String IRService::nextRemoteName() {
+    for (unsigned index = 1; index <= 99; ++index) {
+        char name[16];
+        snprintf(name, sizeof(name), "Remote_%02u", index);
+        if (!SD_MMC.exists(remotePath(name))) return String(name);
+    }
+    return "";
+}
+
+void IRService::beginScreenLearn(const String& remote) {
     if (!_ready || !SD_MMC.cardType()) {
         _captureFinished = true;
         _lastCaptureSucceeded = false;
@@ -200,8 +209,8 @@ void IRService::beginScreenLearn() {
     }
     _captureFinished = false;
     _lastCaptureSucceeded = false;
-    _learnRemote = "Remote_01";
-    if (!ensureRemote(_learnRemote)) {
+    _learnRemote = safeName(remote);
+    if (!_learnRemote.length() || !ensureRemote(_learnRemote)) {
         _captureFinished = true;
         _lastCaptureSucceeded = false;
         _lastCaptureLabel = "Cannot create remote folder on SD";
