@@ -113,7 +113,7 @@ void IRService::poll() {
         _lastCaptureSucceeded = saved;
         _captureFinished = true;
         _lastCaptureLabel = _learnRemote + "/" + _learnButton;
-        Serial0.printf("[IR] %s %s\\n", saved ? "Saved" : "Save failed",
+        Serial0.printf("[IR] %s %s\n", saved ? "Saved" : "Save failed",
                        _lastCaptureLabel.c_str());
         _learning = false;
         _learnRemote = "";
