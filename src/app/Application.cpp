@@ -11,6 +11,24 @@ volatile uint32_t buttonQueueTimes[BUTTON_QUEUE_SIZE] = {};
 volatile bool buttonQueueStates[BUTTON_QUEUE_SIZE] = {};
 volatile bool buttonQueueOverflow = false;
 
+// Hall-effect trackball outputs generate digital pulses as the ball rotates.
+// Count falling edges in the ISR and process them in the main application loop.
+portMUX_TYPE trackballMux = portMUX_INITIALIZER_UNLOCKED;
+volatile uint16_t trackballUpEdges = 0;
+volatile uint16_t trackballDownEdges = 0;
+
+void IRAM_ATTR onTrackballUpEdge() {
+    portENTER_CRITICAL_ISR(&trackballMux);
+    if (trackballUpEdges < 1000) ++trackballUpEdges;
+    portEXIT_CRITICAL_ISR(&trackballMux);
+}
+
+void IRAM_ATTR onTrackballDownEdge() {
+    portENTER_CRITICAL_ISR(&trackballMux);
+    if (trackballDownEdges < 1000) ++trackballDownEdges;
+    portEXIT_CRITICAL_ISR(&trackballMux);
+}
+
 void IRAM_ATTR onBootButtonEdge() {
     const uint8_t head = buttonQueueHead;
     const uint8_t next = static_cast<uint8_t>((head + 1) % BUTTON_QUEUE_SIZE);
@@ -34,6 +52,15 @@ void Application::begin() {
     buttonQueueTail = 0;
     buttonQueueOverflow = false;
     attachInterrupt(digitalPinToInterrupt(InputConfig::PIN_BOOT), onBootButtonEdge, CHANGE);
+
+    pinMode(TrackballConfig::PIN_UP, INPUT);
+    pinMode(TrackballConfig::PIN_DOWN, INPUT);
+    trackballUpEdges = 0;
+    trackballDownEdges = 0;
+    attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_UP), onTrackballUpEdge, FALLING);
+    attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_DOWN), onTrackballDownEdge, FALLING);
+    Serial0.printf("[TRACKBALL] UP=GPIO%d DOWN=GPIO%d; BOOT button is SELECT\\n",
+                   TrackballConfig::PIN_UP, TrackballConfig::PIN_DOWN);
     Serial0.println("[APP] Initialising TFT display...");
     _display.begin();
     Serial0.println("[APP] Initialising SD storage...");
@@ -44,6 +71,26 @@ void Application::begin() {
 }
 
 void Application::update() {
+    // Drain trackball pulse counters outside the ISR. UP moves the selection
+    // one item backwards; DOWN moves it one item forwards.
+    uint16_t upEdges = 0;
+    uint16_t downEdges = 0;
+    portENTER_CRITICAL(&trackballMux);
+    upEdges = trackballUpEdges;
+    downEdges = trackballDownEdges;
+    trackballUpEdges = 0;
+    trackballDownEdges = 0;
+    portEXIT_CRITICAL(&trackballMux);
+
+    // Apply the net movement in one redraw, even if several pulses arrived
+    // while the display or camera was busy.
+    const int trackballMovement = static_cast<int>(downEdges) - static_cast<int>(upEdges);
+    if (trackballMovement != 0) {
+        Serial.printf("[TRACKBALL] UP=%u DOWN=%u movement=%d\\n",
+                      upEdges, downEdges, trackballMovement);
+        moveSelection(trackballMovement);
+    }
+
     // Button edges are captured by an ISR, so short presses are not lost while
     // camera capture/preview or TFT rendering temporarily blocks this loop.
     while (buttonQueueTail != buttonQueueHead) {
@@ -204,7 +251,7 @@ void Application::openHomeItem() {
     switch (_selectedItem) {
         case 0: _messageTitle = "IR RECEIVER"; _messageBody = "Receiver module not connected yet."; _screen = Screen::MESSAGE; break;
         case 1: _messageTitle = "IR TRANSMITTER"; _messageBody = "Transmitter module not connected yet."; _screen = Screen::MESSAGE; break;
-        case 2: _messageTitle = "TRACKBALL"; _messageBody = "Trackball input is not wired yet."; _screen = Screen::MESSAGE; break;
+        case 2: _messageTitle = "TRACKBALL"; _messageBody = "UP / DOWN: move selection\\nBOOT button: select\\nLEFT / RIGHT: expansion board"; _screen = Screen::MESSAGE; break;
         case 3:
             if (!_storage.isMounted()) _storage.begin();
             _screen = Screen::SD_TOOLBOX;
