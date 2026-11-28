@@ -141,8 +141,10 @@ void Application::update() {
     downEdges = trackballDownEdges;
     leftEdges = trackballLeftEdges;
     rightEdges = trackballRightEdges;
-    trackballUpEdges = trackballDownEdges = 0;
-    trackballLeftEdges = trackballRightEdges = 0;
+    trackballUpEdges = 0;
+    trackballDownEdges = 0;
+    trackballLeftEdges = 0;
+    trackballRightEdges = 0;
     portEXIT_CRITICAL(&trackballMux);
 
     // Apply the net movement in one redraw, even if several pulses arrived
@@ -161,7 +163,7 @@ void Application::update() {
     // two quick clicks within one second -> Select
     // hold -> return directly to the Home menu.
     while (buttonQueueTail != buttonQueueHead) {
-        const tail = buttonQueueTail;
+        const uint8_t tail = buttonQueueTail;
         const uint32_t eventTime = buttonQueueTimes[tail];
         const bool reading = buttonQueueStates[tail];
         buttonQueueTail = static_cast<uint8_t>((tail + 1) % BUTTON_QUEUE_SIZE);
