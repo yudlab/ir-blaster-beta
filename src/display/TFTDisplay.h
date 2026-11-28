@@ -19,8 +19,8 @@ public:
     void drawList(const String& title, const std::vector<String>& items,
                   int selectedItem, const String& footer);
     void drawCamera(const String& status);
-    void drawCameraPreview(const uint16_t* pixels, uint16_t width,
-                           uint16_t height, const String& status);
+    bool drawCameraJpeg(const uint8_t* jpeg, size_t length,
+                        const String& status);
     bool drawJpegFromFS(fs::FS& filesystem, const String& path);
 
 private:
