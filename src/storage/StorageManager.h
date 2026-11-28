@@ -27,7 +27,8 @@ public:
     bool isMounted() const;
     bool refresh();
 
-    std::vector<StorageEntry> listDirectory(const String& path);
+    std::vector<StorageEntry> listDirectory(const String& path, size_t offset = 0,
+                                            size_t limit = 40, bool* hasMore = nullptr);
     bool exists(const String& path) const;
     bool createDirectory(const String& path);
     bool remove(const String& path);
