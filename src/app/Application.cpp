@@ -616,6 +616,7 @@ void Application::back() {
     if (_screen == Screen::SD_BROWSER && _currentPath != "/") {
         const int slash = _currentPath.lastIndexOf('/');
         _currentPath = slash <= 0 ? "/" : _currentPath.substring(0, slash);
+        _directoryOffset = 0;
         refreshDirectory();
         _selectedItem = 0;
         render();
@@ -819,6 +820,7 @@ void Application::openSelectedFile() {
     const StorageEntry& entry = _directoryEntries[_selectedFile - 1];
     if (entry.isDirectory) {
         _currentPath = entry.path;
+        _directoryOffset = 0;
         _selectedItem = 0;
         refreshDirectory();
         render();
