@@ -95,7 +95,7 @@ void Application::begin() {
             Serial0.println("[SX1509] Primary detected at 0x3E; trackball UP/DOWN/LEFT/RIGHT use IO0-IO3");
         } else {
             _sx1509PrimaryReady = false;
-            Serial0.println("[SX1509] Primary detected but configuration failed; using direct GPIO");
+            Serial0.println("[SX1509] Primary detected but configuration failed; trackball direction disabled.");
         }
     }
     if (_sx1509SecondaryReady)
@@ -115,6 +115,8 @@ void Application::begin() {
     Serial0.println("[APP] Initialising SD storage...");
     _storage.begin();
     Serial0.printf("[APP] SD mounted: %s\n", _storage.isMounted() ? "yes" : "no");
+    _ir.begin();
+    Serial0.println("[IR] Type HELP in the USB serial monitor for remote/script commands.");
     render();
     Serial0.println("[APP] Initial screen rendered");
 }
