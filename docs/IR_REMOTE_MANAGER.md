@@ -31,7 +31,7 @@ From the home screen select **IR**. The IR menu contains:
 3. **IR Database** — choose a compatible database code stored on the SD card.
 4. **Scripts** — choose and execute a saved script.
 
-The current screen-based recorder assigns names automatically: the first profile is `Remote_01`, and captures are saved as `Button_01`, `Button_02`, and so on. This makes recording possible without a keyboard; custom remote/button naming and on-screen script authoring are not yet implemented.
+The screen-based recorder lets you select an existing remote profile or create a new one. New profiles are named `Remote_01`, `Remote_02`, and so on; buttons are named `Button_01`, `Button_02`, and so on within each profile. This makes recording possible without a keyboard; custom remote/button naming and on-screen script authoring are not yet implemented.
 
 The database browser currently scans the top level of `/IR/database` for files using this firmware's `IRBLASTER1` format. It does not yet download or bundle a public IR database, and it does not yet parse Flipper Zero or IRremote file formats. Copy compatible files into that folder using the SD file manager or a computer.
 
