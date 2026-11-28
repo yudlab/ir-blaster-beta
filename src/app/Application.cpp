@@ -436,6 +436,7 @@ void Application::select() {
 
 void Application::back() {
     if (_screen == Screen::IR_STATUS || _screen == Screen::IR_SAVE_WAIT) {
+        if (_screen == Screen::IR_SAVE_WAIT) _ir.cancelScreenLearn();
         _screen = Screen::IR_MENU;
         _selectedItem = 0;
         render();
