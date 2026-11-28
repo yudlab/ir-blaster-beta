@@ -22,6 +22,15 @@ public:
     void listSavedRemotes(std::vector<String>& items);
     void listSavedButtons(const String& remote, std::vector<String>& items);
     void listDatabaseCodes(std::vector<String>& items);
+    void listUniversalBrands(std::vector<String>& items);
+    void listUniversalCategories(const String& brand, std::vector<String>& items);
+    void listUniversalFiles(const String& brand, const String& category, std::vector<String>& items);
+    void listUniversalButtons(const String& csvPath, std::vector<String>& items);
+    bool sendUniversalButton(const String& csvPath, size_t rowIndex);
+    bool addUniversalShortcut(const String& csvPath, size_t rowIndex, const String& label);
+    bool addCustomShortcut(const String& remote, const String& button);
+    void listShortcuts(std::vector<String>& items);
+    bool sendShortcut(size_t index);
     void listScripts(std::vector<String>& items);
     bool sendSavedButton(const String& remote, const String& button);
     bool sendDatabaseCode(const String& path);
