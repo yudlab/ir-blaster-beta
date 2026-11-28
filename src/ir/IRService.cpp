@@ -68,9 +68,11 @@ bool readCsvDataRow(const String& path, size_t wanted, std::vector<String>& fiel
     while (file.available()) {
         String line = file.readStringUntil('\n');
         line.trim();
+        if (line.startsWith("\xEF\xBB\xBF")) line.remove(0, 3);
         if (!line.length() || line.startsWith("functionname,")) continue;
+        if (!parseCsvFields(line, fields) || fields.size() < 5) continue;
         if (row++ == wanted) {
-            found = parseCsvFields(line, fields);
+            found = true;
             break;
         }
     }
