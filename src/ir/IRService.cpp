@@ -66,6 +66,7 @@ bool IRService::ensureRemote(const String& remote) {
     if (!SD_MMC.exists("/IR")) SD_MMC.mkdir("/IR");
     if (!SD_MMC.exists("/IR/remotes")) SD_MMC.mkdir("/IR/remotes");
     if (!SD_MMC.exists("/IR/scripts")) SD_MMC.mkdir("/IR/scripts");
+    if (!SD_MMC.exists("/IR/database")) SD_MMC.mkdir("/IR/database");
     const String path = remotePath(name);
     return SD_MMC.exists(path) || SD_MMC.mkdir(path);
 }
@@ -200,7 +201,12 @@ void IRService::beginScreenLearn() {
     _captureFinished = false;
     _lastCaptureSucceeded = false;
     _learnRemote = "Remote_01";
-    ensureRemote(_learnRemote);
+    if (!ensureRemote(_learnRemote)) {
+        _captureFinished = true;
+        _lastCaptureSucceeded = false;
+        _lastCaptureLabel = "Cannot create remote folder on SD";
+        return;
+    }
     for (unsigned index = 1; index <= 99; ++index) {
         char name[16];
         snprintf(name, sizeof(name), "Button_%02u", index);
@@ -253,6 +259,8 @@ void IRService::listSavedButtons(const String& remote, std::vector<String>& item
 
 void IRService::listDatabaseCodes(std::vector<String>& items) {
     items.clear();
+    if (!SD_MMC.exists("/IR")) SD_MMC.mkdir("/IR");
+    if (!SD_MMC.exists("/IR/database")) SD_MMC.mkdir("/IR/database");
     File root = SD_MMC.open("/IR/database");
     if (!root || !root.isDirectory()) return;
     File entry = root.openNextFile();
