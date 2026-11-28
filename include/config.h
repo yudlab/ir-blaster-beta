@@ -57,6 +57,8 @@ namespace TrackballConfig {
     constexpr int PIN_DOWN = -1;
     constexpr uint8_t SX1509_PIN_UP = 0;
     constexpr uint8_t SX1509_PIN_DOWN = 1;
+    constexpr uint8_t SX1509_PIN_LEFT = 2;
+    constexpr uint8_t SX1509_PIN_RIGHT = 3;
     constexpr uint32_t EXPANDER_POLL_MS = 2;
 }
 
