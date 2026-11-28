@@ -263,7 +263,13 @@ void Application::moveSelection(int direction) {
     int count = 1;
     switch (_screen) {
         case Screen::HOME: count = 5; break;
-        case Screen::IR_MENU: count = 4; break;
+        case Screen::IR_MENU: count = 3; break;
+        case Screen::IR_RUN_SOURCE: count = 2; break;
+        case Screen::IR_RUN_SOURCE: {
+            const std::vector<String> sources = {"Saved on SD", "IR Database"};
+            _display.drawList("RUN IR CODE", sources, _selectedItem, "Choose code source");
+            break;
+        }
         case Screen::IR_SAVE_TARGET: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
@@ -293,14 +299,23 @@ void Application::select() {
             _irItems.push_back(" [ New remote ]");
             _screen = Screen::IR_SAVE_TARGET;
         } else if (_selectedItem == 1) {
-            _ir.listSavedRemotes(_irItems);
-            _screen = Screen::IR_SAVED_REMOTES;
-        } else if (_selectedItem == 2) {
-            _ir.listDatabaseCodes(_irItems);
-            _screen = Screen::IR_DATABASE;
+            _screen = Screen::IR_RUN_SOURCE;
         } else {
             _ir.listScripts(_irItems);
             _screen = Screen::IR_SCRIPTS;
+        }
+        _selectedItem = 0;
+        render();
+        return;
+    }
+
+    if (_screen == Screen::IR_RUN_SOURCE) {
+        if (_selectedItem == 0) {
+            _ir.listSavedRemotes(_irItems);
+            _screen = Screen::IR_SAVED_REMOTES;
+        } else {
+            _ir.listDatabaseCodes(_irItems);
+            _screen = Screen::IR_DATABASE;
         }
         _selectedItem = 0;
         render();
@@ -449,7 +464,7 @@ void Application::back() {
         render();
         return;
     }
-    if (_screen == Screen::IR_SAVE_TARGET || _screen == Screen::IR_SAVED_REMOTES || _screen == Screen::IR_DATABASE ||
+    if (_screen == Screen::IR_RUN_SOURCE || _screen == Screen::IR_SAVE_TARGET || _screen == Screen::IR_SAVED_REMOTES || _screen == Screen::IR_DATABASE ||
         _screen == Screen::IR_SCRIPTS) {
         _screen = Screen::IR_MENU;
         _selectedItem = 0;
@@ -709,7 +724,7 @@ void Application::render() {
             _display.drawHome(_selectedItem, _storage.isMounted() ? "SD card mounted" : "SD card not mounted");
             break;
         case Screen::IR_MENU: {
-            const std::vector<String> items = {"Save IR", "Run IR Code", "IR Database", "Scripts"};
+            const std::vector<String> items = {"Save IR", "Run IR Code", "Scripts"};
             _display.drawList("IR", items, _selectedItem, _ir.ready() ? "IR RX/TX READY" : "IR HARDWARE NOT READY");
             break;
         }
