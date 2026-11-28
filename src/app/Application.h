@@ -50,6 +50,9 @@ private:
     String _resultBody;
     String _pendingDeletePath;
     std::vector<StorageEntry> _directoryEntries;
+    size_t _directoryOffset = 0;
+    bool _directoryHasMore = false;
+    static constexpr size_t DIRECTORY_PAGE_SIZE = 40;
     std::vector<String> _irItems;
     String _selectedRemote;
     String _selectedDatabaseCode;
