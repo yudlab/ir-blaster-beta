@@ -57,4 +57,11 @@ private:
     void returnHome();
     void runSDAction(int action);
     void showResult(const String& title, const String& body);
+    void pollExpanderTrackball();
+
+    bool _sx1509PrimaryReady = false;
+    bool _sx1509SecondaryReady = false;
+    bool _trackballUsesExpander = false;
+    uint8_t _expanderTrackballPrevious = 0xFF;
+    uint32_t _lastExpanderPoll = 0;
 };
