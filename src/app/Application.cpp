@@ -26,6 +26,7 @@ void IRAM_ATTR onBootButtonEdge() {
 }
 
 void Application::begin() {
+    Serial0.println("[APP] Application::begin() starting");
     pinMode(InputConfig::PIN_BOOT, INPUT_PULLUP);
     _buttonStableState = digitalRead(InputConfig::PIN_BOOT);
     _buttonLastAcceptedChange = millis();
@@ -33,9 +34,13 @@ void Application::begin() {
     buttonQueueTail = 0;
     buttonQueueOverflow = false;
     attachInterrupt(digitalPinToInterrupt(InputConfig::PIN_BOOT), onBootButtonEdge, CHANGE);
+    Serial0.println("[APP] Initialising TFT display...");
     _display.begin();
+    Serial0.println("[APP] Initialising SD storage...");
     _storage.begin();
+    Serial0.printf("[APP] SD mounted: %s\n", _storage.isMounted() ? "yes" : "no");
     render();
+    Serial0.println("[APP] Initial screen rendered");
 }
 
 void Application::update() {
@@ -206,14 +211,18 @@ void Application::openHomeItem() {
             _selectedItem = 0;
             break;
         case 4:
+            Serial0.println("[APP] Camera menu selected");
             _screen = Screen::CAMERA;
             _cameraStatus = "Initialising camera...";
             render();
+            Serial0.println("[APP] Calling CameraService::begin()");
             if (_camera.begin()) {
+                Serial0.println("[APP] Camera initialised; requesting first preview frame");
                 _cameraStatus = "Live preview | click to save";
                 updateCameraPreview();
                 _lastCameraPreview = millis();
             } else {
+                Serial0.println("[APP] Camera initialisation failed");
                 _cameraStatus = "Camera init failed. Click to retry.";
                 render();
             }
@@ -224,12 +233,16 @@ void Application::openHomeItem() {
 }
 
 void Application::updateCameraPreview() {
+    Serial0.println("[APP] updateCameraPreview() called");
     const uint16_t* pixels = nullptr;
     uint16_t width = 0;
     uint16_t height = 0;
     if (_camera.getPreviewFrame(pixels, width, height)) {
+        Serial0.println("[APP] Preview frame decoded; drawing to TFT");
         _display.drawCameraPreview(pixels, width, height, _cameraStatus);
+        Serial0.println("[APP] TFT preview drawing complete");
     } else {
+        Serial0.println("[APP] Preview frame unavailable; showing status screen");
         _cameraStatus = "Preview frame unavailable";
         _display.drawCamera(_cameraStatus);
     }
