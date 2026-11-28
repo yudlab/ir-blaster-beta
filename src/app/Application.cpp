@@ -263,10 +263,27 @@ void Application::moveSelection(int direction) {
     int count = 1;
     switch (_screen) {
         case Screen::HOME: count = 5; break;
-        case Screen::IR_MENU: count = 3; break;
+        case Screen::IR_MENU: count = 5; break;
         case Screen::IR_RUN_SOURCE: count = 2; break;
         case Screen::IR_SAVE_TARGET: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
-        case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
+        case Screen::IR_UNIVERSAL: case Screen::IR_BUTTON_ACTION: case Screen::IR_SHORTCUTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;\n        case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
+        case Screen::IR_UNIVERSAL: {
+            const String title = _universalLevel == 0 ? "IRDB BRANDS" :
+                                 _universalLevel == 1 ? _universalBrand :
+                                 _universalLevel == 2 ? _universalCategory : _universalFile;
+            const String footer = _universalLevel == 0 ? "Browse /codes by brand" :
+                                  _universalLevel == 1 ? "Choose device category" :
+                                  _universalLevel == 2 ? "Choose CSV code set" : "Select a button";
+            _display.drawList(title, _irItems, _selectedItem, footer);
+            break;
+        }
+        case Screen::IR_BUTTON_ACTION:
+            _display.drawList("BUTTON ACTION", _irItems, _selectedItem, "Send or add shortcut");
+            break;
+        case Screen::IR_SHORTCUTS:
+            _display.drawList("REMOTE SHORTCUTS", _irItems, _selectedItem,
+                              _irItems.empty() ? "No saved shortcuts" : "Select to transmit");
+            break;
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::SD_TOOLBOX: count = 6; break;
         case Screen::SD_BROWSER: count = static_cast<int>(_directoryEntries.size()) + 4; break;
@@ -294,6 +311,13 @@ void Application::select() {
             _irItems.push_back(" [ New remote ]");
             _screen = Screen::IR_SAVE_TARGET;
         } else if (_selectedItem == 1) {
+            _universalLevel = 0;
+            _ir.listUniversalBrands(_irItems);
+            _screen = Screen::IR_UNIVERSAL;
+        } else if (_selectedItem == 2) {
+            _ir.listShortcuts(_irItems);
+            _screen = Screen::IR_SHORTCUTS;
+        } else if (_selectedItem == 3) {
             _screen = Screen::IR_RUN_SOURCE;
         } else {
             _ir.listScripts(_irItems);
@@ -356,10 +380,85 @@ void Application::select() {
             render();
             return;
         }
-        const String button = _irItems[_selectedItem];
-        const bool ok = _ir.sendSavedButton(_selectedRemote, button);
-        _messageTitle = ok ? "IR SENT" : "IR SEND FAILED";
-        _messageBody = _selectedRemote + "\n" + button;
+        _selectedButton = _irItems[_selectedItem];
+        _buttonActionIsUniversal = false;
+        _irItems = {"Send now", "Add to Remote Shortcuts"};
+        _selectedItem = 0;
+        _screen = Screen::IR_BUTTON_ACTION;
+        render();
+        return;
+    }
+
+    if (_screen == Screen::IR_UNIVERSAL) {
+        if (_irItems.empty()) {
+            _messageTitle = "NO IRDB DATA";
+            _messageBody = "Copy the IRDB codes folder to the SD card root as /codes.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
+        }
+        if (_universalLevel == 0) {
+            _universalBrand = _irItems[_selectedItem];
+            _ir.listUniversalCategories(_universalBrand, _irItems);
+            _universalLevel = 1;
+        } else if (_universalLevel == 1) {
+            _universalCategory = _irItems[_selectedItem];
+            _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems);
+            _universalLevel = 2;
+        } else if (_universalLevel == 2) {
+            _universalFile = _irItems[_selectedItem];
+            _universalCsvPath = "/codes/" + _universalBrand + "/" +
+                                _universalCategory + "/" + _universalFile + ".csv";
+            _ir.listUniversalButtons(_universalCsvPath, _irItems);
+            _universalLevel = 3;
+        } else {
+            _selectedUniversalRow = static_cast<size_t>(_selectedItem);
+            _selectedUniversalLabel = _irItems[_selectedItem];
+            _buttonActionIsUniversal = true;
+            _irItems = {"Send now", "Add to Remote Shortcuts"};
+            _selectedItem = 0;
+            _screen = Screen::IR_BUTTON_ACTION;
+            render();
+            return;
+        }
+        _selectedItem = 0;
+        render();
+        return;
+    }
+
+    if (_screen == Screen::IR_BUTTON_ACTION) {
+        const bool sendNow = (_selectedItem == 0);
+        bool ok = false;
+        if (_buttonActionIsUniversal) {
+            if (sendNow) ok = _ir.sendUniversalButton(_universalCsvPath, _selectedUniversalRow);
+            else ok = _ir.addUniversalShortcut(_universalCsvPath, _selectedUniversalRow,
+                                               _selectedUniversalLabel);
+        } else {
+            if (sendNow) ok = _ir.sendSavedButton(_selectedRemote, _selectedButton);
+            else ok = _ir.addCustomShortcut(_selectedRemote, _selectedButton);
+        }
+        _messageTitle = sendNow ? (ok ? "IR SENT" : "IR SEND FAILED")
+                                : (ok ? "SHORTCUT SAVED" : "SHORTCUT SAVE FAILED");
+        _messageBody = _buttonActionIsUniversal ? _selectedUniversalLabel
+                                                : _selectedRemote + " " + _selectedButton;
+        _screen = Screen::IR_STATUS;
+        _selectedItem = 0;
+        render();
+        return;
+    }
+
+    if (_screen == Screen::IR_SHORTCUTS) {
+        if (_irItems.empty()) {
+            _messageTitle = "NO SHORTCUTS";
+            _messageBody = "Add a button using Universal Remote or a saved remote.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
+        }
+        const String label = _irItems[_selectedItem];
+        const bool ok = _ir.sendShortcut(static_cast<size_t>(_selectedItem));
+        _messageTitle = ok ? "SHORTCUT SENT" : "SHORTCUT FAILED";
+        _messageBody = label;
         _screen = Screen::IR_STATUS;
         render();
         return;
@@ -452,10 +551,45 @@ void Application::back() {
         render();
         return;
     }
+    if (_screen == Screen::IR_BUTTON_ACTION) {
+        if (_buttonActionIsUniversal) {
+            _ir.listUniversalButtons(_universalCsvPath, _irItems);
+            _screen = Screen::IR_UNIVERSAL;
+        } else {
+            _ir.listSavedButtons(_selectedRemote, _irItems);
+            _screen = Screen::IR_SAVED_BUTTONS;
+        }
+        _selectedItem = 0;
+        render();
+        return;
+    }
     if (_screen == Screen::IR_SAVED_BUTTONS) {
         _ir.listSavedRemotes(_irItems);
         _screen = Screen::IR_SAVED_REMOTES;
         _selectedItem = 0;
+        render();
+        return;
+    }
+    if (_screen == Screen::IR_UNIVERSAL) {
+        if (_universalLevel == 3) {
+            _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems);
+            _universalLevel = 2;
+        } else if (_universalLevel == 2) {
+            _ir.listUniversalCategories(_universalBrand, _irItems);
+            _universalLevel = 1;
+        } else if (_universalLevel == 1) {
+            _ir.listUniversalBrands(_irItems);
+            _universalLevel = 0;
+        } else {
+            _screen = Screen::IR_MENU;
+        }
+        _selectedItem = 0;
+        render();
+        return;
+    }
+    if (_screen == Screen::IR_SHORTCUTS) {
+        _screen = Screen::IR_MENU;
+        _selectedItem = 2;
         render();
         return;
     }
@@ -719,7 +853,7 @@ void Application::render() {
             _display.drawHome(_selectedItem, _storage.isMounted() ? "SD card mounted" : "SD card not mounted");
             break;
         case Screen::IR_MENU: {
-            const std::vector<String> items = {"Save IR", "Run IR Code", "Scripts"};
+            const std::vector<String> items = {"Save IR", "Universal Remote", "Remote Shortcuts", "Run IR Code", "Scripts"};
             _display.drawList("IR", items, _selectedItem, _ir.ready() ? "IR RX/TX READY" : "IR HARDWARE NOT READY");
             break;
         }
