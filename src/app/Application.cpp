@@ -995,9 +995,11 @@ void Application::render() {
             labels.push_back("[R] Rename last listed item");
             if (_directoryOffset > 0) labels.push_back("[<] Previous page");
             if (_directoryHasMore) labels.push_back("[>] Next page");
-            const String directoryStatus = String(_directoryOffset + 1) + "-" +
-                String(_directoryOffset + _directoryEntries.size()) +
-                (_directoryHasMore ? "+ items  " : " items  ") + _currentPath;
+            const String directoryStatus = _directoryEntries.empty()
+                ? "EMPTY  " + _currentPath
+                : String(_directoryOffset + 1) + "-" +
+                  String(_directoryOffset + _directoryEntries.size()) +
+                  (_directoryHasMore ? "+ items  " : " items  ") + _currentPath;
             _display.drawList("FILE MANAGER", labels, _selectedItem, directoryStatus);
             break;
         }
