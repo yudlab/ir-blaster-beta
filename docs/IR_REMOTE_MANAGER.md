@@ -22,6 +22,21 @@ Connect all grounds together. Power down before wiring. Use a transistor driver 
 
 The firmware probes SX1509 addresses 0x3E and 0x3F at startup. Connect the expander before powering on or reset the board after connecting it. Trackball direction inputs are enabled when the primary expander at 0x3E is detected. The secondary expander is detected but not yet assigned functions.
 
+## TFT screen workflow
+
+From the home screen select **IR**. The IR menu contains:
+
+1. **Save IR** — point a remote at the receiver and press one button. The firmware stores the raw capture on the SD card.
+2. **Run IR Code** — choose a saved remote, then choose a button to transmit it.
+3. **IR Database** — choose a compatible database code stored on the SD card.
+4. **Scripts** — choose and execute a saved script.
+
+The current screen-based recorder assigns names automatically: the first profile is `Remote_01`, and captures are saved as `Button_01`, `Button_02`, and so on. This makes recording possible without a keyboard; custom remote/button naming and on-screen script authoring are not yet implemented.
+
+The database browser currently scans the top level of `/IR/database` for files using this firmware's `IRBLASTER1` format. It does not yet download or bundle a public IR database, and it does not yet parse Flipper Zero or IRremote file formats. Copy compatible files into that folder using the SD file manager or a computer.
+
+Navigation: trackball UP/DOWN moves through lists, RIGHT opens/transmits, LEFT goes back. BOOT short-press advances and long-press selects; a very long press goes back.
+
 ## Serial console
 
 Open the USB serial monitor at 115200 baud, select a newline line ending, and type HELP.
