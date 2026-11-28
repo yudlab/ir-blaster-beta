@@ -32,11 +32,25 @@ namespace InputConfig {
     constexpr uint32_t VERY_LONG_PRESS_MS = 1800;
 }
 
-// Temporary BlackBerry Hall-effect trackball inputs.
-// The module has onboard pull-ups; use plain INPUT, not INPUT_PULLUP.
+// I2C bus reserved for automatic SX1509 detection.
+// GPIO14/21 are kept separate from the temporary direct trackball wiring.
+namespace I2CConfig {
+    constexpr int PIN_SDA = 14;
+    constexpr int PIN_SCL = 21;
+    constexpr uint32_t CLOCK_HZ = 400000;
+    constexpr uint8_t SX1509_PRIMARY_ADDRESS = 0x3E;
+    constexpr uint8_t SX1509_SECONDARY_ADDRESS = 0x3F;
+}
+
+// BlackBerry Hall-effect trackball.
+// Before an expander is detected, UP/DOWN use native GPIO1/2.
+// With SX1509 #1 detected, move UP/DOWN wires to SX1509 IO0/IO1.
 namespace TrackballConfig {
     constexpr int PIN_UP = 1;
     constexpr int PIN_DOWN = 2;
+    constexpr uint8_t SX1509_PIN_UP = 0;
+    constexpr uint8_t SX1509_PIN_DOWN = 1;
+    constexpr uint32_t EXPANDER_POLL_MS = 2;
 }
 
 // GOOUUU onboard microSD slot: SD_MMC, 1-bit mode.
