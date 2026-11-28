@@ -82,23 +82,36 @@ void TFTDisplay::drawCamera(const String& status) {
     drawText("Hold: exit camera", 12, 240, 1, ST77XX_WHITE, ST77XX_BLACK);
 }
 
-void TFTDisplay::drawCameraPreview(const uint16_t* pixels, uint16_t width,
-                                   uint16_t height, const String& status) {
-    if (!pixels || width == 0 || height == 0) return;
-
-    // QVGA is 320x240. Landscape rotation makes it fill the 240x320 panel.
-    _tft.setRotation(1);
-    _tft.drawRGBBitmap(0, 0, pixels, width, height);
-    _tft.fillRect(0, 220, 320, 20, ST77XX_BLACK);
-    _tft.setTextWrap(false);
-    drawText(status, 4, 226, 1, ST77XX_WHITE, ST77XX_BLACK);
-    _tft.setTextWrap(true);
-}
-
 bool TFTDisplay::jpegOutput(int16_t x, int16_t y, uint16_t width,
                             uint16_t height, uint16_t* bitmap) {
     if (!_jpegTarget || !bitmap) return false;
     _jpegTarget->_tft.drawRGBBitmap(x, y, bitmap, width, height);
+    return true;
+}
+
+bool TFTDisplay::drawCameraJpeg(const uint8_t* jpeg, size_t length,
+                                const String& status) {
+    if (!jpeg || length < 4) return false;
+
+    _tft.setRotation(1);
+    _tft.fillScreen(ST77XX_BLACK);
+
+    // TJpg_Decoder decodes in small MCU blocks and sends each block directly
+    // to the display. This avoids allocating a 320x240x16-bit RGB565 buffer.
+    _jpegTarget = this;
+    TJpgDec.setJpgScale(1);
+    TJpgDec._swap = false;
+    TJpgDec.setCallback(jpegOutput);
+    const JRESULT result = TJpgDec.drawJpg(0, 0, jpeg,
+                                           static_cast<uint32_t>(length));
+    _jpegTarget = nullptr;
+
+    if (result != JDR_OK) return false;
+
+    _tft.fillRect(0, 220, 320, 20, ST77XX_BLACK);
+    _tft.setTextWrap(false);
+    drawText(status, 4, 226, 1, ST77XX_WHITE, ST77XX_BLACK);
+    _tft.setTextWrap(true);
     return true;
 }
 
@@ -113,8 +126,6 @@ bool TFTDisplay::drawJpegFromFS(fs::FS& filesystem, const String& path) {
     _jpegTarget = nullptr;
     if (decodeResult != JDR_OK) return false;
 
-    // Keep the panel in landscape rotation; show the control hint in a
-    // narrow overlay at the bottom of the 320x240 image.
     _tft.fillRect(0, 220, 320, 20, ST77XX_BLACK);
     _tft.setTextWrap(false);
     drawText("Hold BOOT: back", 4, 226, 1, ST77XX_GREEN, ST77XX_BLACK);
@@ -139,6 +150,6 @@ void TFTDisplay::drawSystemInfo() {
     drawText("Free heap: " + String(ESP.getFreeHeap() / 1024) + " KB", 8, 106, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText(String("PSRAM: ") + (psramFound() ? "Available" : "Not found"), 8, 134, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText("Camera: OV2640", 8, 162, 1, ST77XX_WHITE, ST77XX_BLACK);
-    drawText("SD: SD_MMC 1-bit", 8, 190, 1, ST77XX_WHITE, ST77XX_BLACK);
+    drawText("SD: SDMMC 1-bit", 8, 190, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText("Long press to return", 8, 225, 1, ST77XX_GREEN, ST77XX_BLACK);
 }
