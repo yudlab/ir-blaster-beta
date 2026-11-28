@@ -46,6 +46,7 @@ private:
     bool saveCapture(const esp32irpk::IRReceiveResult<>& result, const String& remote,
                      const String& button);
     bool loadAndSend(const String& remote, const String& button, Print& output);
+    bool loadAndSendPath(const String& path, Print& output);
     bool copyButton(const String& sourceRemote, const String& sourceButton,
                     const String& destinationRemote, const String& destinationButton);
     void listRemotes(Print& output);
