@@ -562,7 +562,8 @@ bool IRService::sendShortcut(size_t wanted) {
     File file = SD_MMC.open("/IR/shortcuts.txt", FILE_READ);
     if (!file) return false;
     size_t index = 0;
-    bool ok = false;
+    String type, first, second;
+    bool found = false;
     while (file.available()) {
         String line = file.readStringUntil('\\n');
         line.trim();
@@ -571,18 +572,20 @@ bool IRService::sendShortcut(size_t wanted) {
         const int c = line.indexOf('|', b + 1);
         if (a < 0 || b < 0 || c < 0) continue;
         if (index++ != wanted) continue;
-        const String type = line.substring(0, a);
-        const String first = line.substring(a + 1, b);
-        const String second = line.substring(b + 1, c);
-        if (type == "U") ok = sendUniversalButton(first, static_cast<size_t>(second.toInt()));
-        else if (type == "C") ok = sendSavedButton(first, second);
+        type = line.substring(0, a);
+        first = line.substring(a + 1, b);
+        second = line.substring(b + 1, c);
+        found = true;
         break;
     }
     file.close();
-    return ok;
+    if (!found) return false;
+    if (type == "U") return sendUniversalButton(first, static_cast<size_t>(second.toInt()));
+    if (type == "C") return sendSavedButton(first, second);
+    return false;
 }
 
-\nvoid IRService::listRemotes(Print& output) {
+void IRService::listRemotes(Print& output) {
     File root = SD_MMC.open("/IR/remotes");
     if (!root || !root.isDirectory()) { output.println("No saved remotes yet."); return; }
     File remote = root.openNextFile();
