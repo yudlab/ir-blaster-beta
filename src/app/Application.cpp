@@ -390,12 +390,37 @@ void Application::select() {
         const int previousPageIndex = static_cast<int>(itemCount);
         const int nextPageIndex = previousPageIndex + (_universalOffset > 0 ? 1 : 0);
 
+        bool pageChanged = false;
         if (_universalOffset > 0 && _selectedItem == previousPageIndex) {
             _universalOffset = _universalOffset > UNIVERSAL_PAGE_SIZE
                 ? _universalOffset - UNIVERSAL_PAGE_SIZE : 0;
+            pageChanged = true;
         } else if (_universalHasMore && _selectedItem == nextPageIndex) {
             _universalOffset += UNIVERSAL_PAGE_SIZE;
-        } else {
+            pageChanged = true;
+        }
+
+        if (pageChanged) {
+            if (_universalLevel == 0) {
+                _ir.listUniversalBrands(_irItems, _universalOffset,
+                                        UNIVERSAL_PAGE_SIZE, &_universalHasMore);
+            } else if (_universalLevel == 1) {
+                _ir.listUniversalCategories(_universalBrand, _irItems, _universalOffset,
+                                            UNIVERSAL_PAGE_SIZE, &_universalHasMore);
+            } else if (_universalLevel == 2) {
+                _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems,
+                                       _universalOffset, UNIVERSAL_PAGE_SIZE,
+                                       &_universalHasMore);
+            } else {
+                _ir.listUniversalButtons(_universalCsvPath, _irItems, _universalOffset,
+                                         UNIVERSAL_PAGE_SIZE, &_universalHasMore);
+            }
+            _selectedItem = 0;
+            render();
+            return;
+        }
+
+        {
             if (_irItems.empty() || _selectedItem < 0 ||
                 static_cast<size_t>(_selectedItem) >= itemCount) {
                 _messageTitle = "NO IRDB DATA";
