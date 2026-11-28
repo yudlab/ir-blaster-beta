@@ -125,8 +125,8 @@ void Application::update() {
     if (_screen == Screen::IR_SAVE_WAIT && _ir.captureFinished()) {
         _messageTitle = _ir.lastCaptureSucceeded() ? "IR SAVED" : "IR SAVE FAILED";
         _messageBody = _ir.lastCaptureSucceeded()
-            ? _ir.lastCaptureLabel() + "\\nSaved to SD card."
-            : _ir.lastCaptureLabel() + "\\nCheck receiver and SD card.";
+            ? _ir.lastCaptureLabel() + "\nSaved to SD card."
+            : _ir.lastCaptureLabel() + "\nCheck receiver and SD card.";
         _screen = Screen::IR_STATUS;
         _selectedItem = 0;
         render();
@@ -149,7 +149,7 @@ void Application::update() {
     // while the display or camera was busy.
     const int trackballMovement = static_cast<int>(downEdges) - static_cast<int>(upEdges);
     if (trackballMovement != 0) {
-        Serial.printf("[TRACKBALL] UP=%u DOWN=%u movement=%d\\n",
+        Serial.printf("[TRACKBALL] UP=%u DOWN=%u movement=%d\n",
                       upEdges, downEdges, trackballMovement);
         moveSelection(trackballMovement);
     }
@@ -349,7 +349,7 @@ void Application::select() {
         const String button = _irItems[_selectedItem];
         const bool ok = _ir.sendSavedButton(_selectedRemote, button);
         _messageTitle = ok ? "IR SENT" : "IR SEND FAILED";
-        _messageBody = _selectedRemote + "\\n" + button;
+        _messageBody = _selectedRemote + "\n" + button;
         _screen = Screen::IR_STATUS;
         render();
         return;
@@ -502,7 +502,7 @@ void Application::back() {
 void Application::openHomeItem() {
     switch (_selectedItem) {
         case 0: _screen = Screen::IR_MENU; _selectedItem = 0; break;
-        case 1: _messageTitle = "TRACKBALL"; _messageBody = "UP / DOWN: move selection\\nLEFT: back  RIGHT: open\\nBOOT button: select"; _screen = Screen::MESSAGE; break;
+        case 1: _messageTitle = "TRACKBALL"; _messageBody = "UP / DOWN: move selection\nLEFT: back  RIGHT: open\nBOOT button: select"; _screen = Screen::MESSAGE; break;
         case 2:
             if (!_storage.isMounted()) _storage.begin();
             _screen = Screen::SD_TOOLBOX;
@@ -716,7 +716,7 @@ void Application::render() {
             _display.drawList("SAVE IR TO", _irItems, _selectedItem, "Choose remote or New remote");
             break;
         case Screen::IR_SAVE_WAIT:
-            _display.drawMessage("RECORD IR", "Point remote at receiver.\\nPress the remote button once.\\nSaving to Remote_01 on SD...");
+            _display.drawMessage("RECORD IR", "Point remote at receiver.\nPress the remote button once.\nSaving to Remote_01 on SD...");
             break;
         case Screen::IR_STATUS:
             _display.drawMessage(_messageTitle, _messageBody);
@@ -788,7 +788,7 @@ void Application::render() {
             break;
         case Screen::IMAGE_VIEWER:
             if (!_display.drawJpegFromFS(SD_MMC, _viewingImagePath)) {
-                _display.drawMessage("IMAGE ERROR", "Could not decode JPEG.\\nLong press to return.");
+                _display.drawMessage("IMAGE ERROR", "Could not decode JPEG.\nLong press to return.");
             }
             break;
         case Screen::SYSTEM_INFO: _display.drawSystemInfo(); break;
