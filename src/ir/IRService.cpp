@@ -86,6 +86,7 @@ bool parseCsvFieldsFixed(const char* line, char fields[5][CSV_FIELD_CAPACITY]) {
 }
 
 void stripCsvBom(char* line) {
+    if (strlen(line) < 3) return;
     const unsigned char* bytes = reinterpret_cast<const unsigned char*>(line);
     if (bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
         memmove(line, line + 3, strlen(line + 3) + 1);
@@ -450,6 +451,7 @@ bool IRService::runSavedScript(const String& name) {
 
 void IRService::listUniversalBrands(std::vector<String>& items) {
     items.clear();
+    items.reserve(24);
     File root = SD_MMC.open("/codes");
     if (!root || !root.isDirectory()) { if (root) root.close(); return; }
     File entry = root.openNextFile();
@@ -469,6 +471,7 @@ void IRService::listUniversalBrands(std::vector<String>& items) {
 
 void IRService::listUniversalCategories(const String& brand, std::vector<String>& items) {
     items.clear();
+    items.reserve(24);
     File root = SD_MMC.open(childPath("/codes", brand));
     if (!root || !root.isDirectory()) { if (root) root.close(); return; }
     File entry = root.openNextFile();
@@ -489,6 +492,7 @@ void IRService::listUniversalCategories(const String& brand, std::vector<String>
 void IRService::listUniversalFiles(const String& brand, const String& category,
                                    std::vector<String>& items) {
     items.clear();
+    items.reserve(24);
     const String folder = childPath(childPath("/codes", brand), category);
     File root = SD_MMC.open(folder);
     if (!root || !root.isDirectory()) { if (root) root.close(); return; }
