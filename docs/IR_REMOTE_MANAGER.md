@@ -1,6 +1,6 @@
 # IR remote manager
 
-The IR subsystem uses the ESP32-S3 native RMT peripheral for capture and transmission. SX1509 expanders are reserved for GPIO expansion and trackball inputs; do not connect IR RX or TX to an SX1509.
+The IR subsystem uses the ESP32-S3 native RMT peripheral for capture and transmission. PlatformIO is pinned to espressif32 8.x because ESP32IRPulseKit requires Arduino-ESP32 Core 3.x. SX1509 expanders are reserved for GPIO expansion and trackball inputs; do not connect IR RX or TX to an SX1509.
 
 ## Wiring
 
