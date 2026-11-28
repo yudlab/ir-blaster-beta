@@ -43,9 +43,9 @@ void TFTDisplay::drawHome(int selectedItem, const String& status) {
     _tft.setRotation(0);
     _tft.fillScreen(ST77XX_BLACK);
     drawHeader("ESP IR BLASTER");
-    drawMenuItem(40, "IR Receiver", selectedItem == 0);
-    drawMenuItem(76, "IR Transmitter", selectedItem == 1);
-    drawMenuItem(112, "Trackball Test", selectedItem == 2);
+    drawMenuItem(40, "IR Remote Manager", selectedItem == 0);
+    drawMenuItem(76, "IR Scripts", selectedItem == 1);
+    drawMenuItem(112, "Trackball", selectedItem == 2);
     drawMenuItem(148, "SD Toolbox", selectedItem == 3);
     drawMenuItem(184, "Camera", selectedItem == 4);
     drawMenuItem(220, "System Information", selectedItem == 5);
