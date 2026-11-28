@@ -266,24 +266,8 @@ void Application::moveSelection(int direction) {
         case Screen::IR_MENU: count = 5; break;
         case Screen::IR_RUN_SOURCE: count = 2; break;
         case Screen::IR_SAVE_TARGET: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
-        case Screen::IR_UNIVERSAL: case Screen::IR_BUTTON_ACTION: case Screen::IR_SHORTCUTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;\n        case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
-        case Screen::IR_UNIVERSAL: {
-            const String title = _universalLevel == 0 ? "IRDB BRANDS" :
-                                 _universalLevel == 1 ? _universalBrand :
-                                 _universalLevel == 2 ? _universalCategory : _universalFile;
-            const String footer = _universalLevel == 0 ? "Browse /codes by brand" :
-                                  _universalLevel == 1 ? "Choose device category" :
-                                  _universalLevel == 2 ? "Choose CSV code set" : "Select a button";
-            _display.drawList(title, _irItems, _selectedItem, footer);
-            break;
-        }
-        case Screen::IR_BUTTON_ACTION:
-            _display.drawList("BUTTON ACTION", _irItems, _selectedItem, "Send or add shortcut");
-            break;
-        case Screen::IR_SHORTCUTS:
-            _display.drawList("REMOTE SHORTCUTS", _irItems, _selectedItem,
-                              _irItems.empty() ? "No saved shortcuts" : "Select to transmit");
-            break;
+        case Screen::IR_UNIVERSAL: case Screen::IR_BUTTON_ACTION: case Screen::IR_SHORTCUTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
+        case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::SD_TOOLBOX: count = 6; break;
         case Screen::SD_BROWSER: count = static_cast<int>(_directoryEntries.size()) + 4; break;
@@ -876,6 +860,23 @@ void Application::render() {
             break;
         case Screen::IR_SAVED_BUTTONS:
             _display.drawList(_selectedRemote, _irItems, _selectedItem, _irItems.empty() ? "No saved buttons" : "Select to transmit");
+            break;
+        case Screen::IR_UNIVERSAL: {
+            const String title = _universalLevel == 0 ? "IRDB BRANDS" :
+                                 _universalLevel == 1 ? _universalBrand :
+                                 _universalLevel == 2 ? _universalCategory : _universalFile;
+            const String footer = _universalLevel == 0 ? "Browse /codes by brand" :
+                                  _universalLevel == 1 ? "Choose device category" :
+                                  _universalLevel == 2 ? "Choose CSV code set" : "Select a button";
+            _display.drawList(title, _irItems, _selectedItem, footer);
+            break;
+        }
+        case Screen::IR_BUTTON_ACTION:
+            _display.drawList("BUTTON ACTION", _irItems, _selectedItem, "Send or add shortcut");
+            break;
+        case Screen::IR_SHORTCUTS:
+            _display.drawList("REMOTE SHORTCUTS", _irItems, _selectedItem,
+                              _irItems.empty() ? "No saved shortcuts" : "Select to transmit");
             break;
         case Screen::IR_DATABASE:
             _display.drawList("IR DATABASE", _irItems, _selectedItem, _irItems.empty() ? "Add .ir files to /IR/database" : "Select code to transmit");
