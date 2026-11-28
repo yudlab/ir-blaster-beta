@@ -80,7 +80,7 @@ bool readCsvDataRow(const String& path, size_t wanted, std::vector<String>& fiel
     return found && fields.size() >= 5;
 }
 }
-\nIRService::IRService()
+IRService::IRService()
     : _rx(IRConfig::PIN_RX, IRConfig::RX_INVERTED), _tx(IRConfig::PIN_TX) {}
 
 bool IRService::begin() {
