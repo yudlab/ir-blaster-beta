@@ -64,6 +64,9 @@ private:
     String _selectedUniversalLabel;
     size_t _selectedUniversalRow = 0;
     int _universalLevel = 0;
+    size_t _universalOffset = 0;
+    bool _universalHasMore = false;
+    static constexpr size_t UNIVERSAL_PAGE_SIZE = 32;
     bool _buttonActionIsUniversal = false;
 
     void render();
