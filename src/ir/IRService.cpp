@@ -66,7 +66,7 @@ bool readCsvDataRow(const String& path, size_t wanted, std::vector<String>& fiel
     size_t row = 0;
     bool found = false;
     while (file.available()) {
-        String line = file.readStringUntil('\\n');
+        String line = file.readStringUntil('\n');
         line.trim();
         if (!line.length() || line.startsWith("functionname,")) continue;
         if (row++ == wanted) {
@@ -445,7 +445,7 @@ void IRService::listUniversalButtons(const String& csvPath, std::vector<String>&
     File file = SD_MMC.open(csvPath, FILE_READ);
     if (!file || file.isDirectory()) { if (file) file.close(); return; }
     while (file.available()) {
-        String line = file.readStringUntil('\\n');
+        String line = file.readStringUntil('\n');
         line.trim();
         if (!line.length() || line.startsWith("functionname,")) continue;
         std::vector<String> fields;
@@ -546,7 +546,7 @@ void IRService::listShortcuts(std::vector<String>& items) {
     File file = SD_MMC.open("/IR/shortcuts.txt", FILE_READ);
     if (!file) return;
     while (file.available()) {
-        String line = file.readStringUntil('\\n');
+        String line = file.readStringUntil('\n');
         line.trim();
         const int a = line.indexOf('|');
         const int b = line.indexOf('|', a + 1);
@@ -565,7 +565,7 @@ bool IRService::sendShortcut(size_t wanted) {
     String type, first, second;
     bool found = false;
     while (file.available()) {
-        String line = file.readStringUntil('\\n');
+        String line = file.readStringUntil('\n');
         line.trim();
         const int a = line.indexOf('|');
         const int b = line.indexOf('|', a + 1);
