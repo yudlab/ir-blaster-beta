@@ -43,14 +43,13 @@ void TFTDisplay::drawHome(int selectedItem, const String& status) {
     _tft.setRotation(0);
     _tft.fillScreen(ST77XX_BLACK);
     drawHeader("ESP IR BLASTER");
-    drawMenuItem(40, "IR Remote Manager", selectedItem == 0);
-    drawMenuItem(76, "IR Scripts", selectedItem == 1);
-    drawMenuItem(112, "Trackball", selectedItem == 2);
-    drawMenuItem(148, "SD Toolbox", selectedItem == 3);
-    drawMenuItem(184, "Camera", selectedItem == 4);
-    drawMenuItem(220, "System Information", selectedItem == 5);
-    drawText(status, 8, 265, 1, ST77XX_GREEN, ST77XX_BLACK);
-    drawText("Short: next   Long: select", 8, 284, 1, ST77XX_WHITE, ST77XX_BLACK);
+    drawMenuItem(40, "IR", selectedItem == 0);
+    drawMenuItem(76, "Trackball", selectedItem == 1);
+    drawMenuItem(112, "SD Toolbox", selectedItem == 2);
+    drawMenuItem(148, "Camera", selectedItem == 3);
+    drawMenuItem(184, "System Information", selectedItem == 4);
+    drawText(status, 8, 235, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText("Short: next   Long: select", 8, 270, 1, ST77XX_WHITE, ST77XX_BLACK);
 }
 
 void TFTDisplay::drawList(const String& title, const std::vector<String>& items,
