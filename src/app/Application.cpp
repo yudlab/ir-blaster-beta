@@ -2,6 +2,43 @@
 
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include <Wire.h>
+
+namespace {
+constexpr uint8_t SX1509_REG_DIR_B = 0x0E;
+constexpr uint8_t SX1509_REG_DIR_A = 0x0F;
+constexpr uint8_t SX1509_REG_PULLUP_A = 0x07;
+constexpr uint8_t SX1509_REG_DATA_A = 0x11;
+
+bool sx1509WriteRegister(uint8_t address, uint8_t reg, uint8_t value) {
+    Wire.beginTransmission(address);
+    Wire.write(reg);
+    Wire.write(value);
+    return Wire.endTransmission() == 0;
+}
+
+bool sx1509ReadRegister(uint8_t address, uint8_t reg, uint8_t& value) {
+    Wire.beginTransmission(address);
+    Wire.write(reg);
+    if (Wire.endTransmission(false) != 0) return false;
+    if (Wire.requestFrom(static_cast<int>(address), 1) != 1) return false;
+    value = Wire.read();
+    return true;
+}
+
+bool sx1509Responds(uint8_t address) {
+    uint8_t value = 0;
+    return sx1509ReadRegister(address, SX1509_REG_DATA_A, value);
+}
+
+bool sx1509ConfigureTrackball(uint8_t address) {
+    // Configure the first four pins as inputs; enable internal pull-ups on
+    // IO0/IO1 (UP/DOWN). The trackball module may also have onboard pull-ups.
+    return sx1509WriteRegister(address, SX1509_REG_DIR_A, 0xFF) &&
+           sx1509WriteRegister(address, SX1509_REG_DIR_B, 0xFF) &&
+           sx1509WriteRegister(address, SX1509_REG_PULLUP_A, 0x03);
+}
+}
 
 namespace {
 constexpr uint8_t BUTTON_QUEUE_SIZE = 16;
@@ -53,14 +90,38 @@ void Application::begin() {
     buttonQueueOverflow = false;
     attachInterrupt(digitalPinToInterrupt(InputConfig::PIN_BOOT), onBootButtonEdge, CHANGE);
 
-    pinMode(TrackballConfig::PIN_UP, INPUT);
-    pinMode(TrackballConfig::PIN_DOWN, INPUT);
+    // Probe the shared I2C bus at boot. No expander is required for normal
+    // operation: if none is found, the existing direct GPIO trackball remains.
+    Wire.begin(I2CConfig::PIN_SDA, I2CConfig::PIN_SCL);
+    Wire.setClock(I2CConfig::CLOCK_HZ);
+    _sx1509PrimaryReady = sx1509Responds(I2CConfig::SX1509_PRIMARY_ADDRESS);
+    _sx1509SecondaryReady = sx1509Responds(I2CConfig::SX1509_SECONDARY_ADDRESS);
+    if (_sx1509PrimaryReady) {
+        _trackballUsesExpander = sx1509ConfigureTrackball(I2CConfig::SX1509_PRIMARY_ADDRESS);
+        if (_trackballUsesExpander) {
+            sx1509ReadRegister(I2CConfig::SX1509_PRIMARY_ADDRESS,
+                               SX1509_REG_DATA_A, _expanderTrackballPrevious);
+            Serial0.println("[SX1509] Primary detected at 0x3E; trackball inputs use IO0/IO1");
+        } else {
+            _sx1509PrimaryReady = false;
+            Serial0.println("[SX1509] Primary detected but configuration failed; using direct GPIO");
+        }
+    }
+    if (_sx1509SecondaryReady)
+        Serial0.println("[SX1509] Secondary detected at 0x3F");
+
     trackballUpEdges = 0;
     trackballDownEdges = 0;
-    attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_UP), onTrackballUpEdge, FALLING);
-    attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_DOWN), onTrackballDownEdge, FALLING);
-    Serial0.printf("[TRACKBALL] UP=GPIO%d DOWN=GPIO%d; BOOT button is SELECT\\n",
-                   TrackballConfig::PIN_UP, TrackballConfig::PIN_DOWN);
+    if (_trackballUsesExpander) {
+        Serial0.println("[TRACKBALL] UP=SX1509 IO0 DOWN=SX1509 IO1; BOOT button is SELECT");
+    } else {
+        pinMode(TrackballConfig::PIN_UP, INPUT);
+        pinMode(TrackballConfig::PIN_DOWN, INPUT);
+        attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_UP), onTrackballUpEdge, FALLING);
+        attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_DOWN), onTrackballDownEdge, FALLING);
+        Serial0.printf("[TRACKBALL] Direct mode: UP=GPIO%d DOWN=GPIO%d; BOOT button is SELECT\\n",
+                       TrackballConfig::PIN_UP, TrackballConfig::PIN_DOWN);
+    }
     Serial0.println("[APP] Initialising TFT display...");
     _display.begin();
     Serial0.println("[APP] Initialising SD storage...");
@@ -71,6 +132,8 @@ void Application::begin() {
 }
 
 void Application::update() {
+    if (_trackballUsesExpander) pollExpanderTrackball();
+
     // Drain trackball pulse counters outside the ISR. UP moves the selection
     // one item backwards; DOWN moves it one item forwards.
     uint16_t upEdges = 0;
@@ -146,6 +209,32 @@ void Application::update() {
         _lastCameraPreview = millis();
     }
     if (millis() - _lastRefresh >= 250) _lastRefresh = millis();
+}
+
+void Application::pollExpanderTrackball() {
+    if (millis() - _lastExpanderPoll < TrackballConfig::EXPANDER_POLL_MS) return;
+    _lastExpanderPoll = millis();
+
+    uint8_t current = 0xFF;
+    if (!sx1509ReadRegister(I2CConfig::SX1509_PRIMARY_ADDRESS,
+                            SX1509_REG_DATA_A, current)) {
+        Serial0.println("[SX1509] Read failed; expander trackball temporarily unavailable");
+        return;
+    }
+
+    // Hall outputs idle HIGH and pulse LOW. Count each HIGH-to-LOW transition.
+    const uint8_t falling = static_cast<uint8_t>(_expanderTrackballPrevious & ~current);
+    if (falling & (1U << TrackballConfig::SX1509_PIN_UP)) {
+        portENTER_CRITICAL(&trackballMux);
+        if (trackballUpEdges < 1000) ++trackballUpEdges;
+        portEXIT_CRITICAL(&trackballMux);
+    }
+    if (falling & (1U << TrackballConfig::SX1509_PIN_DOWN)) {
+        portENTER_CRITICAL(&trackballMux);
+        if (trackballDownEdges < 1000) ++trackballDownEdges;
+        portEXIT_CRITICAL(&trackballMux);
+    }
+    _expanderTrackballPrevious = current;
 }
 
 void Application::moveSelection(int direction) {
