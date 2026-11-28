@@ -27,12 +27,32 @@ The firmware probes SX1509 addresses 0x3E and 0x3F at startup. Connect the expan
 From the home screen select **IR**. The IR menu contains:
 
 1. **Save IR** — choose an existing remote profile or create a new profile, then point the original remote at the receiver and press one button.
-2. **Run IR Code** — choose either **Saved on SD** (select a remote, then a button) or **IR Database** (select a compatible database code).
-3. **Scripts** — choose and execute a saved script.
+2. **Universal Remote** — browse the Probonopd IRDB CSV tree by brand, device category, code set and button name. Each button opens an action screen with **Send now** and **Add to Remote Shortcuts**.
+3. **Remote Shortcuts** — one combined quick-access list containing favourites from both Universal Remote and your own learned remotes. Selecting an entry transmits that button.
+4. **Run IR Code** — choose either **Saved on SD** (select a remote, then a button) or the existing custom **IR Database** folder.
+5. **Scripts** — choose and execute a saved script.
+
+In a saved custom remote's button list, selecting a button also opens **Send now** / **Add to Remote Shortcuts**. Shortcuts store a reference to the original button rather than duplicating its IR data.
 
 The screen-based recorder lets you select an existing remote profile or create a new one. New profiles are named `Remote_01`, `Remote_02`, and so on; buttons are named `Button_01`, `Button_02`, and so on within each profile. This makes recording possible without a keyboard; custom remote/button naming and on-screen script authoring are not yet implemented.
 
-The database browser currently scans the top level of `/IR/database` for files using this firmware's `IRBLASTER1` format. It does not yet download or bundle a public IR database, and it does not yet parse Flipper Zero or IRremote file formats. Copy compatible files into that folder using the SD file manager or a computer.
+## Probonopd IRDB CSV database
+
+Copy the repository's `codes` directory to the SD card root without renaming it. The expected layout is:
+
+    /codes/Samsung/TV/7,7.csv
+    /codes/Sony/TV/1,-1.csv
+    /IR/remotes/<remote>/<button>.ir
+    /IR/scripts/<name>.irs
+    /IR/shortcuts.txt
+
+The `/codes` tree is kept separate from `/IR`; the firmware reads the original CSV files directly and does not convert or overwrite them. CSV columns are `functionname,protocol,device,subdevice,function`. The browser uses the brand and category folders, then the CSV filename (for example `7,7`) as the code-set identity.
+
+The current Universal Remote encoder supports these verified protocol families: NEC / NECx2, Sony12 / Sony15 / Sony20, JVC, RC5 and Samsung32. Other protocol names are still browsable but transmission is rejected and reported as unsupported; the firmware deliberately does not guess an encoding. NECx2 is sent as a full NEC data frame; receiver compatibility can vary by device. The library currently supplies a default repeat policy, so long-press/repeat behaviour is not yet a perfect emulation of every original remote.
+
+Shortcuts are appended to `/IR/shortcuts.txt`. Universal entries retain the CSV path and data-row index; custom entries retain the remote and button names. Keep the corresponding source CSV or custom remote file in place: deleting or renaming a source makes its shortcut unusable.
+
+The separate `/IR/database` browser remains for this firmware's custom `IRBLASTER1` files. The Universal Remote browser is the CSV reader for Probonopd IRDB; no network downloader or Flipper Zero / IRremote import is implemented.
 
 Navigation: trackball UP/DOWN moves through lists, RIGHT opens/transmits, LEFT goes back. BOOT short-press advances and long-press selects; a very long press goes back.
 
@@ -74,6 +94,8 @@ While recording a script, enter only SEND, DELAY, comment lines beginning with #
 
 - Remotes: /IR/remotes/<remote>/<button>.ir
 - Scripts: /IR/scripts/<name>.irs
+- Remote shortcuts: /IR/shortcuts.txt
+- Probonopd IRDB CSV tree: /codes/<brand>/<category>/<device>,<subdevice>.csv
 
 Each button stores raw timing ticks (10 microseconds per tick), plus protocol metadata when a decoder candidate is available. Raw timings are retained even when the protocol is unknown, so the button can still be replayed.
 
