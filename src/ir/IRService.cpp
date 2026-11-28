@@ -118,7 +118,11 @@ void IRService::poll() {
 }
 
 bool IRService::loadAndSend(const String& remote, const String& button, Print& output) {
-    File file = SD_MMC.open(buttonPath(remote, button), FILE_READ);
+    return loadAndSendPath(buttonPath(remote, button), output);
+}
+
+bool IRService::loadAndSendPath(const String& path, Print& output) {
+    File file = SD_MMC.open(path, FILE_READ);
     if (!file) { output.println("Button not found."); return false; }
 
     String line;
@@ -180,6 +184,118 @@ bool IRService::copyButton(const String& sourceRemote, const String& sourceButto
     const bool ok = destination.getWriteError() == 0;
     destination.close();
     return ok;
+}
+
+
+void IRService::beginScreenLearn() {
+    if (!_ready || !SD_MMC.cardType()) {
+        _captureFinished = true;
+        _lastCaptureSucceeded = false;
+        _lastCaptureLabel = "IR or SD unavailable";
+        return;
+    }
+    _captureFinished = false;
+    _lastCaptureSucceeded = false;
+    _learnRemote = "Remote_01";
+    ensureRemote(_learnRemote);
+    for (unsigned index = 1; index <= 99; ++index) {
+        char name[16];
+        snprintf(name, sizeof(name), "Button_%02u", index);
+        if (!SD_MMC.exists(buttonPath(_learnRemote, name))) {
+            _learnButton = name;
+            _learning = true;
+            return;
+        }
+    }
+    _captureFinished = true;
+    _lastCaptureLabel = "Remote is full";
+}
+
+void IRService::listSavedRemotes(std::vector<String>& items) {
+    items.clear();
+    File root = SD_MMC.open("/IR/remotes");
+    if (!root || !root.isDirectory()) return;
+    File entry = root.openNextFile();
+    while (entry) {
+        if (entry.isDirectory()) {
+            String name = String(entry.name());
+            const int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            items.push_back(name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+}
+
+void IRService::listSavedButtons(const String& remote, std::vector<String>& items) {
+    items.clear();
+    File root = SD_MMC.open(remotePath(remote));
+    if (!root || !root.isDirectory()) return;
+    File entry = root.openNextFile();
+    while (entry) {
+        if (!entry.isDirectory()) {
+            String name = String(entry.name());
+            const int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            if (name.endsWith(".ir")) name.remove(name.length() - 3);
+            items.push_back(name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+}
+
+void IRService::listDatabaseCodes(std::vector<String>& items) {
+    items.clear();
+    File root = SD_MMC.open("/IR/database");
+    if (!root || !root.isDirectory()) return;
+    File entry = root.openNextFile();
+    while (entry) {
+        if (!entry.isDirectory() && String(entry.name()).endsWith(".ir")) {
+            String name = String(entry.name());
+            const int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            items.push_back(name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+}
+
+void IRService::listScripts(std::vector<String>& items) {
+    items.clear();
+    File root = SD_MMC.open("/IR/scripts");
+    if (!root || !root.isDirectory()) return;
+    File entry = root.openNextFile();
+    while (entry) {
+        if (!entry.isDirectory() && String(entry.name()).endsWith(".irs")) {
+            String name = String(entry.name());
+            const int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            name.remove(name.length() - 4);
+            items.push_back(name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+}
+
+bool IRService::sendSavedButton(const String& remote, const String& button) {
+    return loadAndSend(remote, button, Serial0);
+}
+
+bool IRService::sendDatabaseCode(const String& path) {
+    return loadAndSendPath(path, Serial0);
+}
+
+bool IRService::runSavedScript(const String& name) {
+    runScript(name, Serial0);
+    return true;
 }
 
 void IRService::listRemotes(Print& output) {
