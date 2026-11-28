@@ -265,11 +265,6 @@ void Application::moveSelection(int direction) {
         case Screen::HOME: count = 5; break;
         case Screen::IR_MENU: count = 3; break;
         case Screen::IR_RUN_SOURCE: count = 2; break;
-        case Screen::IR_RUN_SOURCE: {
-            const std::vector<String> sources = {"Saved on SD", "IR Database"};
-            _display.drawList("RUN IR CODE", sources, _selectedItem, "Choose code source");
-            break;
-        }
         case Screen::IR_SAVE_TARGET: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
@@ -728,11 +723,16 @@ void Application::render() {
             _display.drawList("IR", items, _selectedItem, _ir.ready() ? "IR RX/TX READY" : "IR HARDWARE NOT READY");
             break;
         }
+        case Screen::IR_RUN_SOURCE: {
+            const std::vector<String> sources = {"Saved on SD", "IR Database"};
+            _display.drawList("RUN IR CODE", sources, _selectedItem, "Choose code source");
+            break;
+        }
         case Screen::IR_SAVE_TARGET:
             _display.drawList("SAVE IR TO", _irItems, _selectedItem, "Choose remote or New remote");
             break;
         case Screen::IR_SAVE_WAIT:
-            _display.drawMessage("RECORD IR", "Point remote at receiver.\nPress the remote button once.\nSaving to Remote_01 on SD...");
+            _display.drawMessage("RECORD IR", "Point remote at receiver.\nPress the remote button once.\nSaving to selected remote on SD...");
             break;
         case Screen::IR_STATUS:
             _display.drawMessage(_messageTitle, _messageBody);
