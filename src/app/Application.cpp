@@ -176,6 +176,9 @@ void Application::update() {
         if (reading == LOW) {
             _buttonPressedAt = eventTime;
             _buttonHoldHandled = false;
+            _buttonSecondClickCandidate = _buttonPendingClick &&
+                (eventTime - _buttonPendingClickAt) <
+                    InputConfig::DOUBLE_PRESS_WINDOW_MS;
             Serial.println("[BTN] BOOT pressed");
         } else {
             const uint32_t duration = eventTime - _buttonPressedAt;
@@ -192,13 +195,13 @@ void Application::update() {
                 _buttonHoldHandled = false;
             } else if (_buttonHoldHandled) {
                 _buttonHoldHandled = false;
-            } else if (_buttonPendingClick &&
-                       (eventTime - _buttonPendingClickAt) <
-                           InputConfig::DOUBLE_PRESS_WINDOW_MS) {
+            } else if (_buttonSecondClickCandidate) {
                 _buttonPendingClick = false;
+                _buttonSecondClickCandidate = false;
                 Serial.println("[BTN] Double click -> Select");
                 select();
             } else {
+                _buttonSecondClickCandidate = false;
                 // Do not fire Back immediately: retain this click briefly so
                 // a second tap can be interpreted as Select.
                 _buttonPendingClick = true;
@@ -214,6 +217,7 @@ void Application::update() {
         (millis() - _buttonPressedAt) >= InputConfig::HOLD_TO_HOME_MS) {
         _buttonHoldHandled = true;
         _buttonPendingClick = false;
+        _buttonSecondClickCandidate = false;
         if (_screen == Screen::IR_SAVE_WAIT) _ir.cancelScreenLearn();
         Serial.println("[BTN] Hold -> Home");
         returnHome();
