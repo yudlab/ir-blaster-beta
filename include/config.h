@@ -32,6 +32,13 @@ namespace InputConfig {
     constexpr uint32_t VERY_LONG_PRESS_MS = 1800;
 }
 
+// Temporary BlackBerry Hall-effect trackball inputs.
+// The module has onboard pull-ups; use plain INPUT, not INPUT_PULLUP.
+namespace TrackballConfig {
+    constexpr int PIN_UP = 1;
+    constexpr int PIN_DOWN = 2;
+}
+
 // GOOUUU onboard microSD slot: SD_MMC, 1-bit mode.
 namespace SDConfig {
     constexpr int PIN_CMD = 38;
