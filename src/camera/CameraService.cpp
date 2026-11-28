@@ -1,35 +1,36 @@
 #include "CameraService.h"
 
 #include <esp_camera.h>
-#include <img_converters.h>
 #include <esp_heap_caps.h>
 #include "config.h"
+#include "display/TFTDisplay.h"
 #include "storage/StorageManager.h"
+
+namespace {
+void logMemory(const char* stage) {
+    const size_t psramTotal = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
+    const size_t psramFree = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    const size_t internalFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+
+    Serial0.printf("[MEM] %s | heap=%u | PSRAM total=%u free=%u | internal free=%u | ESP.freePSRAM=%u\n",
+                   stage,
+                   static_cast<unsigned>(ESP.getFreeHeap()),
+                   static_cast<unsigned>(psramTotal),
+                   static_cast<unsigned>(psramFree),
+                   static_cast<unsigned>(internalFree),
+                   static_cast<unsigned>(ESP.getFreePsram()));
+}
+}
 
 bool CameraService::begin() {
     Serial0.println("[CAM] begin() called");
-    Serial0.printf("[CAM] State: ready=%s previewBuffer=%p\n",
-                   _ready ? "yes" : "no", _previewBuffer);
+    Serial0.printf("[CAM] State: ready=%s\n", _ready ? "yes" : "no");
     if (_ready) {
         Serial0.println("[CAM] Already initialised; reusing camera");
         return true;
     }
 
-    if (!_previewBuffer) {
-        const size_t bufferBytes = static_cast<size_t>(_previewWidth) *
-                                   _previewHeight * sizeof(uint16_t);
-        Serial0.printf("[CAM] Allocating preview buffer: %u bytes in PSRAM\n",
-                       static_cast<unsigned>(bufferBytes));
-        _previewBuffer = static_cast<uint16_t*>(
-            heap_caps_malloc(bufferBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-        if (!_previewBuffer) {
-            Serial0.printf("[CAM] ERROR: PSRAM allocation failed; free PSRAM=%u\n",
-                           static_cast<unsigned>(ESP.getFreePsram()));
-            return false;
-        }
-        Serial0.printf("[CAM] Preview buffer allocated at %p; free PSRAM=%u\n",
-                       _previewBuffer, static_cast<unsigned>(ESP.getFreePsram()));
-    }
+    logMemory("before camera init");
 
     camera_config_t config = {};
     config.ledc_channel = LEDC_CHANNEL_0;
@@ -57,9 +58,9 @@ bool CameraService::begin() {
     config.pixel_format = PIXFORMAT_JPEG;
     config.frame_size = FRAMESIZE_QVGA;
     config.jpeg_quality = 12;
-    config.fb_count = 2;
+    config.fb_count = 1;
     config.fb_location = CAMERA_FB_IN_PSRAM;
-    config.grab_mode = CAMERA_GRAB_LATEST;
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
 
     Serial0.println("[CAM] Camera configuration:");
     Serial0.printf("[CAM]   SCCB SDA/SCL: %d/%d\n", config.pin_sccb_sda, config.pin_sccb_scl);
@@ -68,10 +69,8 @@ bool CameraService::begin() {
     Serial0.printf("[CAM]   Data pins D0-D7: %d,%d,%d,%d,%d,%d,%d,%d\n",
                    config.pin_d0, config.pin_d1, config.pin_d2, config.pin_d3,
                    config.pin_d4, config.pin_d5, config.pin_d6, config.pin_d7);
-    Serial0.println("[CAM]   Format: JPEG | Frame size: QVGA | Buffers: 2 | Location: PSRAM");
-    Serial0.printf("[CAM] Free heap before init: %u | free PSRAM: %u\n",
-                   static_cast<unsigned>(ESP.getFreeHeap()),
-                   static_cast<unsigned>(ESP.getFreePsram()));
+    Serial0.println("[CAM]   Format: JPEG | Frame size: QVGA | Buffers: 1 | Location: PSRAM");
+    logMemory("before esp_camera_init");
     Serial0.flush();
 
     Serial0.println("[CAM] Calling esp_camera_init()...");
@@ -94,47 +93,31 @@ bool CameraService::begin() {
     }
 
     _ready = true;
-    Serial0.printf("[CAM] Camera ready; free heap=%u free PSRAM=%u\n",
-                   static_cast<unsigned>(ESP.getFreeHeap()),
-                   static_cast<unsigned>(ESP.getFreePsram()));
+    logMemory("camera ready");
     return true;
 }
+
 void CameraService::end() {
     if (_ready) {
         esp_camera_deinit();
         _ready = false;
         Serial0.println("[CAM] Camera stopped");
     }
-    if (_previewBuffer) {
-        heap_caps_free(_previewBuffer);
-        _previewBuffer = nullptr;
-    }
+    logMemory("camera stopped");
 }
 
 bool CameraService::isReady() const {
     return _ready;
 }
 
-bool CameraService::getPreviewFrame(const uint16_t*& pixels,
-                                    uint16_t& width, uint16_t& height) {
-    Serial0.println("[CAM][PREVIEW] getPreviewFrame() entered");
-    pixels = nullptr;
-    width = _previewWidth;
-    height = _previewHeight;
-
+bool CameraService::drawPreview(TFTDisplay& display, const String& status) {
+    Serial0.println("[CAM][PREVIEW] drawPreview() entered");
     if (!_ready) {
         Serial0.println("[CAM][PREVIEW] Aborted: camera is not ready");
         return false;
     }
-    if (!_previewBuffer) {
-        Serial0.println("[CAM][PREVIEW] Aborted: preview buffer is null");
-        return false;
-    }
 
-    Serial0.printf("[CAM][PREVIEW] Requesting frame; free heap=%u free PSRAM=%u\n",
-                   static_cast<unsigned>(ESP.getFreeHeap()),
-                   static_cast<unsigned>(ESP.getFreePsram()));
-    Serial0.flush();
+    logMemory("before frame acquisition");
     const uint32_t frameStarted = millis();
     camera_fb_t* frame = esp_camera_fb_get();
     Serial0.printf("[CAM][PREVIEW] esp_camera_fb_get() returned %p after %lu ms\n",
@@ -144,61 +127,32 @@ bool CameraService::getPreviewFrame(const uint16_t*& pixels,
         return false;
     }
 
-    Serial0.println("[CAM][PREVIEW] Frame metadata:");
-    Serial0.printf("[CAM][PREVIEW]   frame=%p buffer=%p length=%u format=%d dimensions=%ux%u\n",
+    Serial0.printf("[CAM][PREVIEW] frame=%p buffer=%p length=%u format=%d size=%ux%u PSRAM=%s\n",
                    frame, frame->buf, static_cast<unsigned>(frame->len),
-                   frame->format, frame->width, frame->height);
-    Serial0.printf("[CAM][PREVIEW]   buffer in PSRAM=%s preview buffer=%p\n",
-                   frame->buf && esp_ptr_external_ram(frame->buf) ? "yes" : "no",
-                   _previewBuffer);
+                   frame->format, frame->width, frame->height,
+                   frame->buf && esp_ptr_external_ram(frame->buf) ? "yes" : "no");
 
-    if (!frame->buf || frame->len < 4) {
-        Serial0.println("[CAM][PREVIEW] ERROR: invalid or empty frame buffer");
-        esp_camera_fb_return(frame);
-        return false;
+    bool rendered = false;
+    if (frame->buf && frame->len >= 4 &&
+        frame->format == PIXFORMAT_JPEG &&
+        frame->buf[0] == 0xFF && frame->buf[1] == 0xD8) {
+        Serial0.println("[CAM][PREVIEW] Sending JPEG to block-based TFT decoder");
+        Serial0.flush();
+        const uint32_t decodeStarted = millis();
+        rendered = display.drawCameraJpeg(frame->buf, frame->len, status);
+        Serial0.printf("[CAM][PREVIEW] TFT JPEG decode result=%s after %lu ms\n",
+                       rendered ? "success" : "failed",
+                       static_cast<unsigned long>(millis() - decodeStarted));
+    } else {
+        Serial0.println("[CAM][PREVIEW] ERROR: invalid JPEG frame metadata/header");
     }
 
-    Serial0.printf("[CAM][PREVIEW] JPEG first bytes: %02X %02X %02X %02X\n",
-                   frame->buf[0], frame->buf[1], frame->buf[2], frame->buf[3]);
-    if (frame->format != PIXFORMAT_JPEG) {
-        Serial0.printf("[CAM][PREVIEW] ERROR: expected JPEG format (%d), got %d\n",
-                       PIXFORMAT_JPEG, frame->format);
-        esp_camera_fb_return(frame);
-        return false;
-    }
-    if (frame->buf[0] != 0xFF || frame->buf[1] != 0xD8) {
-        Serial0.println("[CAM][PREVIEW] ERROR: JPEG SOI marker missing (expected FF D8)");
-        esp_camera_fb_return(frame);
-        return false;
-    }
-
-    Serial0.println("[CAM][PREVIEW] Starting jpg2rgb565()...");
-    Serial0.flush();
-    const uint32_t decodeStarted = millis();
-    const bool converted = jpg2rgb565(
-        frame->buf,
-        frame->len,
-        reinterpret_cast<uint8_t*>(_previewBuffer),
-        JPG_SCALE_NONE
-    );
-    Serial0.printf("[CAM][PREVIEW] jpg2rgb565() returned %s after %lu ms\n",
-                   converted ? "true" : "false",
-                   static_cast<unsigned long>(millis() - decodeStarted));
-
-    // Always return the camera-owned frame, including conversion failures.
     esp_camera_fb_return(frame);
-    Serial0.println("[CAM][PREVIEW] Camera frame returned to driver");
-
-    if (!converted) {
-        Serial0.println("[CAM][PREVIEW] ERROR: JPEG-to-RGB565 conversion failed");
-        return false;
-    }
-
-    pixels = _previewBuffer;
-    Serial0.printf("[CAM][PREVIEW] Preview ready: %ux%u at %p\n",
-                   width, height, pixels);
-    return true;
+    Serial0.println("[CAM][PREVIEW] Camera framebuffer returned");
+    logMemory("after preview");
+    return rendered;
 }
+
 bool CameraService::captureAndSave(StorageManager& storage, String& savedPath) {
     if (!_ready || !storage.isMounted()) {
         Serial0.println("[CAM] Capture refused: camera or SD card is not ready");
@@ -208,6 +162,12 @@ bool CameraService::captureAndSave(StorageManager& storage, String& savedPath) {
     camera_fb_t* frame = esp_camera_fb_get();
     if (!frame) {
         Serial0.println("[CAM] Failed to acquire capture frame");
+        return false;
+    }
+
+    if (!frame->buf || frame->format != PIXFORMAT_JPEG) {
+        esp_camera_fb_return(frame);
+        Serial0.println("[CAM] Capture refused: camera did not return a JPEG frame");
         return false;
     }
 
