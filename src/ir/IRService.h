@@ -17,6 +17,7 @@ public:
     bool lastCaptureSucceeded() const { return _lastCaptureSucceeded; }
     String lastCaptureLabel() const { return _lastCaptureLabel; }
     void beginScreenLearn(const String& remote);
+    void cancelScreenLearn();
     String nextRemoteName();
     void listSavedRemotes(std::vector<String>& items);
     void listSavedButtons(const String& remote, std::vector<String>& items);
