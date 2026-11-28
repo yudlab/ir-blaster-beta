@@ -3,20 +3,18 @@
 #include <Arduino.h>
 
 class StorageManager;
+class TFTDisplay;
 
-// Camera capture is deliberately separate from storage. JPEG frames are saved
-// through StorageManager; preview frames are decoded into a reusable PSRAM buffer.
+// Camera frames remain JPEG in PSRAM. Preview decoding is streamed directly
+// to the TFT, avoiding a second full-frame RGB565 allocation.
 class CameraService {
 public:
     bool begin();
     void end();
     bool isReady() const;
-    bool getPreviewFrame(const uint16_t*& pixels, uint16_t& width, uint16_t& height);
+    bool drawPreview(TFTDisplay& display, const String& status);
     bool captureAndSave(StorageManager& storage, String& savedPath);
 
 private:
     bool _ready = false;
-    uint16_t* _previewBuffer = nullptr;
-    uint16_t _previewWidth = 320;
-    uint16_t _previewHeight = 240;
 };
