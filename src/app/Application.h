@@ -6,6 +6,7 @@
 #include "camera/CameraService.h"
 #include "display/TFTDisplay.h"
 #include "storage/StorageManager.h"
+#include "ir/IRService.h"
 
 class Application {
 public:
@@ -24,6 +25,7 @@ private:
     TFTDisplay _display;
     StorageManager _storage;
     CameraService _camera;
+    IRService _ir;
 
     Screen _screen = Screen::HOME;
     int _selectedItem = 0;
