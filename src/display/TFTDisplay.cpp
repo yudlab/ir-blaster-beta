@@ -150,5 +150,7 @@ void TFTDisplay::drawSystemInfo() {
     drawText(String("PSRAM: ") + (psramFound() ? "Available" : "Not found"), 8, 134, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText("Camera: OV2640", 8, 162, 1, ST77XX_WHITE, ST77XX_BLACK);
     drawText("SD: SDMMC 1-bit", 8, 190, 1, ST77XX_WHITE, ST77XX_BLACK);
-    drawText("Long press to return", 8, 225, 1, ST77XX_GREEN, ST77XX_BLACK);
+    drawText("Contains/accesses irdb by Simon Peter and contributors, used under permission. For licensing details and for information on how to contribute to the database, see https://github.com/probonopd/irdb",
+             8, 214, 1, ST77XX_YELLOW, ST77XX_BLACK);
+    drawText("Long press to return", 8, 294, 1, ST77XX_GREEN, ST77XX_BLACK);
 }
