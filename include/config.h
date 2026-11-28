@@ -42,12 +42,19 @@ namespace I2CConfig {
     constexpr uint8_t SX1509_SECONDARY_ADDRESS = 0x3F;
 }
 
-// BlackBerry Hall-effect trackball.
-// Before an expander is detected, UP/DOWN use native GPIO1/2.
-// With SX1509 #1 detected, move UP/DOWN wires to SX1509 IO0/IO1.
+// IR signals use native ESP32-S3 RMT GPIOs; do not route through SX1509.
+namespace IRConfig {
+    constexpr int PIN_TX = 1;
+    constexpr int PIN_RX = 2;
+    constexpr bool RX_INVERTED = true;
+    constexpr uint32_t DEFAULT_CARRIER_HZ = 38000;
+}
+
+// BlackBerry Hall-effect trackball. Direction signals are on SX1509 #1.
+// GPIO1/2 are reserved for IR TX/RX; BOOT remains the select button.
 namespace TrackballConfig {
-    constexpr int PIN_UP = 1;
-    constexpr int PIN_DOWN = 2;
+    constexpr int PIN_UP = -1;
+    constexpr int PIN_DOWN = -1;
     constexpr uint8_t SX1509_PIN_UP = 0;
     constexpr uint8_t SX1509_PIN_DOWN = 1;
     constexpr uint32_t EXPANDER_POLL_MS = 2;
