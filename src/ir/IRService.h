@@ -12,12 +12,27 @@ public:
     void poll();
     void handleCommand(const String& line, Print& output);
     bool ready() const { return _ready; }
+    bool learning() const { return _learning; }
+    bool captureFinished() const { return _captureFinished; }
+    bool lastCaptureSucceeded() const { return _lastCaptureSucceeded; }
+    String lastCaptureLabel() const { return _lastCaptureLabel; }
+    void beginScreenLearn();
+    void listSavedRemotes(std::vector<String>& items);
+    void listSavedButtons(const String& remote, std::vector<String>& items);
+    void listDatabaseCodes(std::vector<String>& items);
+    void listScripts(std::vector<String>& items);
+    bool sendSavedButton(const String& remote, const String& button);
+    bool sendDatabaseCode(const String& path);
+    bool runSavedScript(const String& name);
 
 private:
     esp32irpk::IRReceiver<> _rx;
     esp32irpk::IRSender _tx;
     bool _ready = false;
     bool _learning = false;
+    bool _captureFinished = false;
+    bool _lastCaptureSucceeded = false;
+    String _lastCaptureLabel;
     String _learnRemote;
     String _learnButton;
     String _scriptPath;
