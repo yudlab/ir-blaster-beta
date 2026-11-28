@@ -476,6 +476,7 @@ bool IRService::sendUniversalButton(const String& csvPath, size_t rowIndex) {
 
     if (protocol == "NECX2" || protocol == "NEC") {
         // IRDB stores NEC extended-address bytes as device/subdevice.
+        if (device > 0xFF || subdevice > 0xFF) return false;
         const uint16_t address = static_cast<uint16_t>(
             (device & 0xFF) | ((subdevice < 0 ? 0 : (subdevice & 0xFF)) << 8));
         if (function > 0xFF) return false;
