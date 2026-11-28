@@ -58,10 +58,15 @@ bool StorageManager::refresh() {
     return begin();
 }
 
-std::vector<StorageEntry> StorageManager::listDirectory(const String& path) {
+std::vector<StorageEntry> StorageManager::listDirectory(
+    const String& path, size_t offset, size_t limit, bool* hasMore) {
     std::vector<StorageEntry> entries;
-    if (!_mounted) return entries;
+    if (hasMore) *hasMore = false;
+    if (!_mounted || limit == 0) return entries;
 
+    // Only retain one page in RAM. Large IRDB folders can contain hundreds
+    // of entries; the TFT only displays seven rows at a time.
+    entries.reserve(limit);
     File directory = SD_MMC.open(path);
     if (!directory || !directory.isDirectory()) {
         Serial.printf("[SD] Cannot open directory: %s\n", path.c_str());
@@ -69,18 +74,37 @@ std::vector<StorageEntry> StorageManager::listDirectory(const String& path) {
         return entries;
     }
 
+    size_t seen = 0;
     File file = directory.openNextFile();
     while (file) {
+        if (seen++ < offset) {
+            file.close();
+            file = directory.openNextFile();
+            if ((seen & 0x0F) == 0) yield();
+            continue;
+        }
+
+        if (entries.size() >= limit) {
+            if (hasMore) *hasMore = true;
+            file.close();
+            break;
+        }
+
         StorageEntry entry;
-        entry.name = String(file.name());
+        entry.name = file.name();
         const int slash = entry.name.lastIndexOf('/');
-        if (slash >= 0) entry.name = entry.name.substring(slash + 1);
-        entry.path = path == "/" ? "/" + entry.name : path + "/" + entry.name;
+        if (slash >= 0) entry.name.remove(0, slash + 1);
+        entry.path.reserve(path.length() + entry.name.length() + 2);
+        entry.path = path;
+        if (!entry.path.endsWith("/")) entry.path += '/';
+        entry.path += entry.name;
         entry.isDirectory = file.isDirectory();
         entry.size = entry.isDirectory ? 0 : file.size();
-        entries.push_back(entry);
+        entries.emplace_back(std::move(entry));
+
         file.close();
         file = directory.openNextFile();
+        if ((seen & 0x0F) == 0) yield();
     }
     directory.close();
     return entries;
