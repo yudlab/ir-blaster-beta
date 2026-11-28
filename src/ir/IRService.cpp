@@ -1,11 +1,11 @@
 #include "IRService.h"
 
 #include <SD_MMC.h>
+#include "config.h"
 #include <algorithm>
 
 namespace {
 constexpr size_t MAX_CAPTURE_TICKS = 4096;
-constexpr uint32_t DEFAULT_CARRIER_HZ = 38000;
 
 bool readLine(File& file, String& line) {
     line = file.readStringUntil('\n');
@@ -22,7 +22,7 @@ bool parseKeyValue(const String& line, const char* key, uint32_t& value) {
 }
 
 IRService::IRService()
-    : _rx(IRConfig::PIN_RX, true), _tx(IRConfig::PIN_TX) {}
+    : _rx(IRConfig::PIN_RX, IRConfig::RX_INVERTED), _tx(IRConfig::PIN_TX) {}
 
 bool IRService::begin() {
     if (!SD_MMC.cardType()) {
@@ -84,7 +84,7 @@ bool IRService::saveCapture(const esp32irpk::IRReceiveResult<>& result,
     file.printf("protocol=%u\n", bits ? static_cast<unsigned>(bits->protocol_id) : 0U);
     file.printf("bit_length=%u\n", bits ? bits->bit_length : 0U);
     file.printf("value=%llu\n", static_cast<unsigned long long>(bits ? bits->bits : 0ULL));
-    file.printf("carrier=%lu\n", static_cast<unsigned long>(DEFAULT_CARRIER_HZ));
+    file.printf("carrier=%lu\n", static_cast<unsigned long>(IRConfig::DEFAULT_CARRIER_HZ));
     file.printf("ticks=%u\n", static_cast<unsigned>(result.raw.len));
     for (size_t i = 0; i < result.raw.len; ++i) {
         if (i) file.print(',');
@@ -125,7 +125,7 @@ bool IRService::loadAndSend(const String& remote, const String& button, Print& o
     if (!readLine(file, line) || line != "IRBLASTER1") {
         file.close(); output.println("Invalid IR file."); return false;
     }
-    uint32_t carrier = DEFAULT_CARRIER_HZ;
+    uint32_t carrier = IRConfig::DEFAULT_CARRIER_HZ;
     uint32_t tickCount = 0;
     uint32_t ignored = 0;
     for (int i = 0; i < 5; ++i) {
