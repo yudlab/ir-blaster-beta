@@ -3,6 +3,8 @@
 #include <SD_MMC.h>
 #include "config.h"
 #include <algorithm>
+#include <cstring>
+#include <cctype>
 
 namespace {
 constexpr size_t MAX_CAPTURE_TICKS = 4096;
@@ -23,22 +25,70 @@ bool parseKeyValue(const String& line, const char* key, uint32_t& value) {
 
 
 namespace {
-bool parseCsvFields(const String& line, std::vector<String>& fields) {
-    fields.clear();
-    String field;
+constexpr size_t CSV_LINE_CAPACITY = 256;
+constexpr size_t CSV_FIELD_CAPACITY = 96;
+
+bool readCsvLine(File& file, char* output, size_t capacity) {
+    if (!output || capacity < 2) return false;
+    size_t length = 0;
+    bool consumed = false;
+    bool overflow = false;
+    while (file.available()) {
+        const int value = file.read();
+        if (value < 0) break;
+        consumed = true;
+        if (value == '\n') break;
+        if (value == '\r') continue;
+        if (length + 1 < capacity) output[length++] = static_cast<char>(value);
+        else overflow = true;
+    }
+    output[length] = '\0';
+    return consumed && !overflow;
+}
+
+bool parseCsvFieldsFixed(const char* line, char fields[5][CSV_FIELD_CAPACITY]) {
+    memset(fields, 0, 5 * CSV_FIELD_CAPACITY);
+    size_t column = 0;
+    size_t length = 0;
     bool quoted = false;
-    for (size_t i = 0; i < line.length(); ++i) {
+    for (size_t i = 0; line[i] != '\0'; ++i) {
         const char ch = line[i];
         if (ch == '"') {
-            if (quoted && i + 1 < line.length() && line[i + 1] == '"') {
-                field += '"'; ++i;
-            } else quoted = !quoted;
+            if (quoted && line[i + 1] == '"') {
+                if (column < 5 && length + 1 < CSV_FIELD_CAPACITY)
+                    fields[column][length++] = '"';
+                ++i;
+            } else {
+                quoted = !quoted;
+            }
         } else if (ch == ',' && !quoted) {
-            field.trim(); fields.push_back(field); field = "";
-        } else field += ch;
+            if (column < 4) {
+                fields[column][length] = '\0';
+                ++column;
+                length = 0;
+            } else {
+                break;
+            }
+        } else if (column < 5 && length + 1 < CSV_FIELD_CAPACITY) {
+            fields[column][length++] = ch;
+        }
     }
-    field.trim(); fields.push_back(field);
-    return !quoted;
+    if (quoted || column < 4) return false;
+    for (size_t i = 0; i < 5; ++i) {
+        size_t n = strlen(fields[i]);
+        while (n && isspace(static_cast<unsigned char>(fields[i][n - 1])))
+            fields[i][--n] = '\0';
+        size_t first = 0;
+        while (fields[i][first] && isspace(static_cast<unsigned char>(fields[i][first]))) ++first;
+        if (first) memmove(fields[i], fields[i] + first, strlen(fields[i] + first) + 1);
+    }
+    return true;
+}
+
+void stripCsvBom(char* line) {
+    const unsigned char* bytes = reinterpret_cast<const unsigned char*>(line);
+    if (bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+        memmove(line, line + 3, strlen(line + 3) + 1);
 }
 
 String csvBaseName(const String& path) {
@@ -48,7 +98,12 @@ String csvBaseName(const String& path) {
 }
 
 String childPath(const String& parent, const String& name) {
-    return parent.endsWith("/") ? parent + name : parent + "/" + name;
+    String path;
+    path.reserve(parent.length() + name.length() + 2);
+    path = parent;
+    if (!path.endsWith("/")) path += '/';
+    path += name;
+    return path;
 }
 
 String cleanShortcutField(String value) {
@@ -63,23 +118,31 @@ String cleanShortcutField(String value) {
 bool readCsvDataRow(const String& path, size_t wanted, std::vector<String>& fields) {
     File file = SD_MMC.open(path, FILE_READ);
     if (!file || file.isDirectory()) { if (file) file.close(); return false; }
+
+    char line[CSV_LINE_CAPACITY];
+    char parsed[5][CSV_FIELD_CAPACITY];
     size_t row = 0;
     bool found = false;
+    fields.clear();
     while (file.available()) {
-        String line = file.readStringUntil('\n');
-        line.trim();
-        if (line.startsWith("\xEF\xBB\xBF")) line.remove(0, 3);
-        if (!line.length() || line.startsWith("functionname,")) continue;
-        if (!parseCsvFields(line, fields) || fields.size() < 5) continue;
-        if (row++ == wanted) {
-            found = true;
-            break;
-        }
+        if (!readCsvLine(file, line, sizeof(line))) continue;
+        stripCsvBom(line);
+        char* text = line;
+        while (*text && isspace(static_cast<unsigned char>(*text))) ++text;
+        if (!*text || strncmp(text, "functionname,", 13) == 0) continue;
+        if (!parseCsvFieldsFixed(text, parsed)) continue;
+        if (row++ != wanted) continue;
+
+        fields.reserve(5);
+        for (size_t i = 0; i < 5; ++i) fields.emplace_back(parsed[i]);
+        found = true;
+        break;
     }
     file.close();
-    return found && fields.size() >= 5;
+    return found;
 }
 }
+
 IRService::IRService()
     : _rx(IRConfig::PIN_RX, IRConfig::RX_INVERTED), _tx(IRConfig::PIN_TX) {}
 
@@ -444,16 +507,28 @@ void IRService::listUniversalFiles(const String& brand, const String& category,
 
 void IRService::listUniversalButtons(const String& csvPath, std::vector<String>& items) {
     items.clear();
+    items.reserve(24);
     File file = SD_MMC.open(csvPath, FILE_READ);
     if (!file || file.isDirectory()) { if (file) file.close(); return; }
+
+    char line[CSV_LINE_CAPACITY];
+    char fields[5][CSV_FIELD_CAPACITY];
     while (file.available()) {
-        String line = file.readStringUntil('\n');
-        line.trim();
-        if (!line.length() || line.startsWith("functionname,")) continue;
-        std::vector<String> fields;
-        if (!parseCsvFields(line, fields) || fields.size() < 5) continue;
-        String label = fields[0].length() ? fields[0] : ("Function " + fields[4]);
-        items.push_back(label);
+        if (!readCsvLine(file, line, sizeof(line))) continue;
+        stripCsvBom(line);
+        char* text = line;
+        while (*text && isspace(static_cast<unsigned char>(*text))) ++text;
+        if (!*text || strncmp(text, "functionname,", 13) == 0) continue;
+        if (!parseCsvFieldsFixed(text, fields)) continue;
+
+        char fallback[24];
+        const char* label = fields[0];
+        if (!label[0]) {
+            snprintf(fallback, sizeof(fallback), "Function %.15s", fields[4]);
+            label = fallback;
+        }
+        items.emplace_back(label);
+        if ((items.size() & 0x0F) == 0) yield();
     }
     file.close();
 }
