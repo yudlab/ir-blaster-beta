@@ -234,13 +234,8 @@ void Application::openHomeItem() {
 
 void Application::updateCameraPreview() {
     Serial0.println("[APP] updateCameraPreview() called");
-    const uint16_t* pixels = nullptr;
-    uint16_t width = 0;
-    uint16_t height = 0;
-    if (_camera.getPreviewFrame(pixels, width, height)) {
-        Serial0.println("[APP] Preview frame decoded; drawing to TFT");
-        _display.drawCameraPreview(pixels, width, height, _cameraStatus);
-        Serial0.println("[APP] TFT preview drawing complete");
+    if (_camera.drawPreview(_display, _cameraStatus)) {
+        Serial0.println("[APP] Camera JPEG decoded directly to TFT");
     } else {
         Serial0.println("[APP] Preview frame unavailable; showing status screen");
         _cameraStatus = "Preview frame unavailable";
@@ -272,12 +267,7 @@ void Application::captureCameraImage() {
     }
     // Capture feedback is shown immediately; the live preview resumes on the
     // next update tick without requiring another button press.
-    const uint16_t* pixels = nullptr;
-    uint16_t width = 0;
-    uint16_t height = 0;
-    if (_camera.getPreviewFrame(pixels, width, height)) {
-        _display.drawCameraPreview(pixels, width, height, _cameraStatus);
-    } else {
+    if (!_camera.drawPreview(_display, _cameraStatus)) {
         _display.drawCamera(_cameraStatus);
     }
     _lastCameraPreview = millis();
