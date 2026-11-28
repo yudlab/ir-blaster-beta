@@ -3,6 +3,7 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include <Wire.h>
+#include <ctype.h>
 
 namespace {
 constexpr uint8_t SX1509_REG_DIR_B = 0x0E;
@@ -90,8 +91,8 @@ void Application::begin() {
     buttonQueueOverflow = false;
     attachInterrupt(digitalPinToInterrupt(InputConfig::PIN_BOOT), onBootButtonEdge, CHANGE);
 
-    // Probe the shared I2C bus at boot. No expander is required for normal
-    // operation: if none is found, the existing direct GPIO trackball remains.
+    // Probe the shared I2C bus at boot. GPIO1/2 are reserved for IR RMT, so
+    // trackball direction is available only when SX1509 #1 is connected.
     Wire.begin(I2CConfig::PIN_SDA, I2CConfig::PIN_SCL);
     Wire.setClock(I2CConfig::CLOCK_HZ);
     _sx1509PrimaryReady = sx1509Responds(I2CConfig::SX1509_PRIMARY_ADDRESS);
@@ -115,12 +116,7 @@ void Application::begin() {
     if (_trackballUsesExpander) {
         Serial0.println("[TRACKBALL] UP=SX1509 IO0 DOWN=SX1509 IO1; BOOT button is SELECT");
     } else {
-        pinMode(TrackballConfig::PIN_UP, INPUT);
-        pinMode(TrackballConfig::PIN_DOWN, INPUT);
-        attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_UP), onTrackballUpEdge, FALLING);
-        attachInterrupt(digitalPinToInterrupt(TrackballConfig::PIN_DOWN), onTrackballDownEdge, FALLING);
-        Serial0.printf("[TRACKBALL] Direct mode: UP=GPIO%d DOWN=GPIO%d; BOOT button is SELECT\\n",
-                       TrackballConfig::PIN_UP, TrackballConfig::PIN_DOWN);
+        Serial0.println("[TRACKBALL] SX1509 #1 not detected; direction inputs disabled. BOOT remains SELECT.");
     }
     Serial0.println("[APP] Initialising TFT display...");
     _display.begin();
@@ -132,6 +128,7 @@ void Application::begin() {
 }
 
 void Application::update() {
+    _ir.poll();
     if (_trackballUsesExpander) pollExpanderTrackball();
 
     // Drain trackball pulse counters outside the ISR. UP moves the selection
@@ -192,15 +189,25 @@ void Application::update() {
         Serial.println("[BTN] Warning: button event queue overflowed");
     }
 
+    // Uppercase commands are line-oriented; lowercase w/s/e/b remain quick
+    // navigation shortcuts. Physical BOOT/trackball controls remain available.
+    static String serialLine;
     while (Serial.available()) {
         const char key = static_cast<char>(Serial.read());
-        if (key == 'w' || key == 'W') moveSelection(-1);
-        else if (key == 's' || key == 'S') moveSelection(1);
-        else if (key == 'e' || key == 'E' || key == '\n') {
+        if (key == '\r') continue;
+        if (key == '\n') {
+            if (serialLine.length()) _ir.handleCommand(serialLine, Serial);
+            serialLine = "";
+            continue;
+        }
+        if (!serialLine.length() && key == 'w') moveSelection(-1);
+        else if (!serialLine.length() && key == 's') moveSelection(1);
+        else if (!serialLine.length() && key == 'e') {
             if (_screen == Screen::CAMERA) captureCameraImage();
             else select();
         }
-        else if (key == 'b' || key == 'B') back();
+        else if (!serialLine.length() && key == 'b') back();
+        else if (serialLine.length() < 160) serialLine += key;
     }
 
     if (_screen == Screen::CAMERA && _camera.isReady() &&
@@ -338,8 +345,8 @@ void Application::back() {
 
 void Application::openHomeItem() {
     switch (_selectedItem) {
-        case 0: _messageTitle = "IR RECEIVER"; _messageBody = "Receiver module not connected yet."; _screen = Screen::MESSAGE; break;
-        case 1: _messageTitle = "IR TRANSMITTER"; _messageBody = "Transmitter module not connected yet."; _screen = Screen::MESSAGE; break;
+        case 0: _messageTitle = "IR REMOTE MANAGER"; _messageBody = "USB serial monitor at 115200 baud.\\nType HELP for LEARN, LIST, SEND and COPY."; _screen = Screen::MESSAGE; break;
+        case 1: _messageTitle = "IR SCRIPTS"; _messageBody = "Serial: SCRIPT <name>, then SEND/DELAY lines, END to save.\\nRUN <name> to execute."; _screen = Screen::MESSAGE; break;
         case 2: _messageTitle = "TRACKBALL"; _messageBody = "UP / DOWN: move selection\\nBOOT button: select\\nLEFT / RIGHT: expansion board"; _screen = Screen::MESSAGE; break;
         case 3:
             if (!_storage.isMounted()) _storage.begin();
