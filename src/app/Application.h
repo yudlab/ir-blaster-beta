@@ -19,7 +19,7 @@ public:
 private:
     enum class Screen {
         HOME, IR_MENU, IR_RUN_SOURCE, IR_SAVE_TARGET, IR_SAVE_WAIT, IR_STATUS, IR_SAVED_REMOTES,
-        IR_SAVED_BUTTONS, IR_DATABASE, IR_SCRIPTS,
+        IR_SAVED_BUTTONS, IR_DATABASE, IR_SCRIPTS, IR_UNIVERSAL, IR_BUTTON_ACTION, IR_SHORTCUTS,
         SD_TOOLBOX, SD_BROWSER, SD_INFO, SD_RESULT,
         SD_FORMAT_CONFIRM, SD_DELETE_CONFIRM, CAMERA, IMAGE_VIEWER, SYSTEM_INFO, MESSAGE
     };
@@ -53,6 +53,15 @@ private:
     std::vector<String> _irItems;
     String _selectedRemote;
     String _selectedDatabaseCode;
+    String _selectedButton;
+    String _universalBrand;
+    String _universalCategory;
+    String _universalFile;
+    String _universalCsvPath;
+    String _selectedUniversalLabel;
+    size_t _selectedUniversalRow = 0;
+    int _universalLevel = 0;
+    bool _buttonActionIsUniversal = false;
 
     void render();
     void updateCameraPreview();
