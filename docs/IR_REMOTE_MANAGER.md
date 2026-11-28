@@ -50,6 +50,10 @@ The `/codes` tree is kept separate from `/IR`; the firmware reads the original C
 
 The current Universal Remote encoder supports these verified protocol families: NEC / NECx2, Sony12 / Sony15 / Sony20, JVC, RC5 and Samsung32. Other protocol names are still browsable but transmission is rejected and reported as unsupported; the firmware deliberately does not guess an encoding. NECx2 is sent as a full NEC data frame; receiver compatibility can vary by device. The library currently supplies a default repeat policy, so long-press/repeat behaviour is not yet a perfect emulation of every original remote.
 
+### IRDB licensing
+
+The upstream IRDB license requires the product maintainer to notify the project by opening an issue before using the database in a product, include the attribution notice in the product, and provide up to three fully licensed product copies/units to the IRDB team free of charge (including shipping) if requested. Review the current terms in the upstream `LICENSE.md` and complete the notification step before distributing or treating this as a finished product. The firmware's System Information screen displays the required attribution notice.
+
 Shortcuts are appended to `/IR/shortcuts.txt`. Universal entries retain the CSV path and data-row index; custom entries retain the remote and button names. Keep the corresponding source CSV or custom remote file in place: deleting or renaming a source makes its shortcut unusable.
 
 The separate `/IR/database` browser remains for this firmware's custom `IRBLASTER1` files. The Universal Remote browser is the CSV reader for Probonopd IRDB; no network downloader or Flipper Zero / IRremote import is implemented.
