@@ -156,10 +156,12 @@ void Application::update() {
     if (leftEdges) back();
     if (rightEdges) select();
 
-    // Button edges are captured by an ISR, so short presses are not lost while
-    // camera capture/preview or TFT rendering temporarily blocks this loop.
+    // BOOT is a three-action control:
+    // single quick click -> Back (deferred while waiting for a possible double click)
+    // two quick clicks within one second -> Select
+    // hold -> return directly to the Home menu.
     while (buttonQueueTail != buttonQueueHead) {
-        const uint8_t tail = buttonQueueTail;
+        const tail = buttonQueueTail;
         const uint32_t eventTime = buttonQueueTimes[tail];
         const bool reading = buttonQueueStates[tail];
         buttonQueueTail = static_cast<uint8_t>((tail + 1) % BUTTON_QUEUE_SIZE);
@@ -178,15 +180,35 @@ void Application::update() {
             const uint32_t duration = eventTime - _buttonPressedAt;
             Serial.printf("[BTN] BOOT released after %lu ms\n",
                           static_cast<unsigned long>(duration));
-            if (_screen == Screen::CAMERA) {
-                if (duration >= InputConfig::LONG_PRESS_MS) back();
-                else captureCameraImage();
-            } else if (_screen == Screen::IMAGE_VIEWER) {
-                if (duration >= InputConfig::LONG_PRESS_MS) back();
-            } else if (duration >= InputConfig::VERY_LONG_PRESS_MS) back();
-            else if (duration >= InputConfig::LONG_PRESS_MS) select();
-            else moveSelection(1);
+
+            if (duration >= InputConfig::HOLD_TO_HOME_MS) {
+                _buttonPendingClick = false;
+                if (_screen == Screen::IR_SAVE_WAIT) _ir.cancelScreenLearn();
+                Serial.println("[BTN] Hold -> Home");
+                returnHome();
+            } else if (_buttonPendingClick &&
+                       (eventTime - _buttonPendingClickAt) <
+                           InputConfig::DOUBLE_PRESS_WINDOW_MS) {
+                _buttonPendingClick = false;
+                Serial.println("[BTN] Double click -> Select");
+                select();
+            } else {
+                // Do not fire Back immediately: retain this click briefly so
+                // a second tap can be interpreted as Select.
+                _buttonPendingClick = true;
+                _buttonPendingClickAt = eventTime;
+                Serial.println("[BTN] Single click pending");
+            }
         }
+    }
+
+    // If no second click arrived within the double-click window, interpret
+    // the pending single click as Back.
+    if (_buttonPendingClick &&
+        (millis() - _buttonPendingClickAt) >= InputConfig::DOUBLE_PRESS_WINDOW_MS) {
+        _buttonPendingClick = false;
+        Serial.println("[BTN] Single click -> Back");
+        back();
     }
 
     if (buttonQueueOverflow) {
