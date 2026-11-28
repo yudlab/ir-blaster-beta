@@ -200,6 +200,13 @@ String IRService::nextRemoteName() {
     return "";
 }
 
+void IRService::cancelScreenLearn() {
+    _learning = false;
+    _learnRemote = "";
+    _learnButton = "";
+    _captureFinished = false;
+}
+
 void IRService::beginScreenLearn(const String& remote) {
     if (!_ready || !SD_MMC.cardType()) {
         _captureFinished = true;
