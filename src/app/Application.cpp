@@ -175,6 +175,7 @@ void Application::update() {
         _buttonLastAcceptedChange = eventTime;
         if (reading == LOW) {
             _buttonPressedAt = eventTime;
+            _buttonHoldHandled = false;
             Serial.println("[BTN] BOOT pressed");
         } else {
             const uint32_t duration = eventTime - _buttonPressedAt;
@@ -182,10 +183,15 @@ void Application::update() {
                           static_cast<unsigned long>(duration));
 
             if (duration >= InputConfig::HOLD_TO_HOME_MS) {
-                _buttonPendingClick = false;
-                if (_screen == Screen::IR_SAVE_WAIT) _ir.cancelScreenLearn();
-                Serial.println("[BTN] Hold -> Home");
-                returnHome();
+                if (!_buttonHoldHandled) {
+                    _buttonPendingClick = false;
+                    if (_screen == Screen::IR_SAVE_WAIT) _ir.cancelScreenLearn();
+                    Serial.println("[BTN] Hold -> Home");
+                    returnHome();
+                }
+                _buttonHoldHandled = false;
+            } else if (_buttonHoldHandled) {
+                _buttonHoldHandled = false;
             } else if (_buttonPendingClick &&
                        (eventTime - _buttonPendingClickAt) <
                            InputConfig::DOUBLE_PRESS_WINDOW_MS) {
@@ -202,9 +208,21 @@ void Application::update() {
         }
     }
 
+    // Trigger Home as soon as the hold threshold is reached, without waiting
+    // for release. A later release edge is ignored for this same hold.
+    if (_buttonStableState == LOW && !_buttonHoldHandled &&
+        (millis() - _buttonPressedAt) >= InputConfig::HOLD_TO_HOME_MS) {
+        _buttonHoldHandled = true;
+        _buttonPendingClick = false;
+        if (_screen == Screen::IR_SAVE_WAIT) _ir.cancelScreenLearn();
+        Serial.println("[BTN] Hold -> Home");
+        returnHome();
+    }
+
     // If no second click arrived within the double-click window, interpret
-    // the pending single click as Back.
-    if (_buttonPendingClick &&
+    // the pending single click as Back. Do not expire it while a second tap
+    // is currently being held down.
+    if (_buttonPendingClick && _buttonStableState == HIGH &&
         (millis() - _buttonPendingClickAt) >= InputConfig::DOUBLE_PRESS_WINDOW_MS) {
         _buttonPendingClick = false;
         Serial.println("[BTN] Single click -> Back");
