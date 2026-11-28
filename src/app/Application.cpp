@@ -37,7 +37,7 @@ bool sx1509ConfigureTrackball(uint8_t address) {
     // IO0/IO1 (UP/DOWN). The trackball module may also have onboard pull-ups.
     return sx1509WriteRegister(address, SX1509_REG_DIR_A, 0xFF) &&
            sx1509WriteRegister(address, SX1509_REG_DIR_B, 0xFF) &&
-           sx1509WriteRegister(address, SX1509_REG_PULLUP_A, 0x03);
+           sx1509WriteRegister(address, SX1509_REG_PULLUP_A, 0x0F);
 }
 }
 
@@ -54,18 +54,8 @@ volatile bool buttonQueueOverflow = false;
 portMUX_TYPE trackballMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint16_t trackballUpEdges = 0;
 volatile uint16_t trackballDownEdges = 0;
-
-void IRAM_ATTR onTrackballUpEdge() {
-    portENTER_CRITICAL_ISR(&trackballMux);
-    if (trackballUpEdges < 1000) ++trackballUpEdges;
-    portEXIT_CRITICAL_ISR(&trackballMux);
-}
-
-void IRAM_ATTR onTrackballDownEdge() {
-    portENTER_CRITICAL_ISR(&trackballMux);
-    if (trackballDownEdges < 1000) ++trackballDownEdges;
-    portEXIT_CRITICAL_ISR(&trackballMux);
-}
+volatile uint16_t trackballLeftEdges = 0;
+volatile uint16_t trackballRightEdges = 0;
 
 void IRAM_ATTR onBootButtonEdge() {
     const uint8_t head = buttonQueueHead;
@@ -102,7 +92,7 @@ void Application::begin() {
         if (_trackballUsesExpander) {
             sx1509ReadRegister(I2CConfig::SX1509_PRIMARY_ADDRESS,
                                SX1509_REG_DATA_A, _expanderTrackballPrevious);
-            Serial0.println("[SX1509] Primary detected at 0x3E; trackball inputs use IO0/IO1");
+            Serial0.println("[SX1509] Primary detected at 0x3E; trackball UP/DOWN/LEFT/RIGHT use IO0-IO3");
         } else {
             _sx1509PrimaryReady = false;
             Serial0.println("[SX1509] Primary detected but configuration failed; using direct GPIO");
@@ -113,8 +103,10 @@ void Application::begin() {
 
     trackballUpEdges = 0;
     trackballDownEdges = 0;
+    trackballLeftEdges = 0;
+    trackballRightEdges = 0;
     if (_trackballUsesExpander) {
-        Serial0.println("[TRACKBALL] UP=SX1509 IO0 DOWN=SX1509 IO1; BOOT button is SELECT");
+        Serial0.println("[TRACKBALL] UP/DOWN/LEFT/RIGHT=SX1509 IO0/IO1/IO2/IO3; BOOT=SELECT");
     } else {
         Serial0.println("[TRACKBALL] SX1509 #1 not detected; direction inputs disabled. BOOT remains SELECT.");
     }
@@ -133,13 +125,14 @@ void Application::update() {
 
     // Drain trackball pulse counters outside the ISR. UP moves the selection
     // one item backwards; DOWN moves it one item forwards.
-    uint16_t upEdges = 0;
-    uint16_t downEdges = 0;
+    uint16_t upEdges = 0, downEdges = 0, leftEdges = 0, rightEdges = 0;
     portENTER_CRITICAL(&trackballMux);
     upEdges = trackballUpEdges;
     downEdges = trackballDownEdges;
-    trackballUpEdges = 0;
-    trackballDownEdges = 0;
+    leftEdges = trackballLeftEdges;
+    rightEdges = trackballRightEdges;
+    trackballUpEdges = trackballDownEdges = 0;
+    trackballLeftEdges = trackballRightEdges = 0;
     portEXIT_CRITICAL(&trackballMux);
 
     // Apply the net movement in one redraw, even if several pulses arrived
@@ -150,6 +143,8 @@ void Application::update() {
                       upEdges, downEdges, trackballMovement);
         moveSelection(trackballMovement);
     }
+    if (leftEdges) back();
+    if (rightEdges) select();
 
     // Button edges are captured by an ISR, so short presses are not lost while
     // camera capture/preview or TFT rendering temporarily blocks this loop.
@@ -239,6 +234,16 @@ void Application::pollExpanderTrackball() {
     if (falling & (1U << TrackballConfig::SX1509_PIN_DOWN)) {
         portENTER_CRITICAL(&trackballMux);
         if (trackballDownEdges < 1000) ++trackballDownEdges;
+        portEXIT_CRITICAL(&trackballMux);
+    }
+    if (falling & (1U << TrackballConfig::SX1509_PIN_LEFT)) {
+        portENTER_CRITICAL(&trackballMux);
+        if (trackballLeftEdges < 1000) ++trackballLeftEdges;
+        portEXIT_CRITICAL(&trackballMux);
+    }
+    if (falling & (1U << TrackballConfig::SX1509_PIN_RIGHT)) {
+        portENTER_CRITICAL(&trackballMux);
+        if (trackballRightEdges < 1000) ++trackballRightEdges;
         portEXIT_CRITICAL(&trackballMux);
     }
     _expanderTrackballPrevious = current;
@@ -347,7 +352,7 @@ void Application::openHomeItem() {
     switch (_selectedItem) {
         case 0: _messageTitle = "IR REMOTE MANAGER"; _messageBody = "USB serial monitor at 115200 baud.\\nType HELP for LEARN, LIST, SEND and COPY."; _screen = Screen::MESSAGE; break;
         case 1: _messageTitle = "IR SCRIPTS"; _messageBody = "Serial: SCRIPT <name>, then SEND/DELAY lines, END to save.\\nRUN <name> to execute."; _screen = Screen::MESSAGE; break;
-        case 2: _messageTitle = "TRACKBALL"; _messageBody = "UP / DOWN: move selection\\nBOOT button: select\\nLEFT / RIGHT: expansion board"; _screen = Screen::MESSAGE; break;
+        case 2: _messageTitle = "TRACKBALL"; _messageBody = "UP / DOWN: move selection\\nLEFT: back  RIGHT: open\\nBOOT button: select"; _screen = Screen::MESSAGE; break;
         case 3:
             if (!_storage.isMounted()) _storage.begin();
             _screen = Screen::SD_TOOLBOX;
