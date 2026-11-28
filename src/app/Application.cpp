@@ -270,7 +270,10 @@ void Application::moveSelection(int direction) {
         case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::SD_TOOLBOX: count = 6; break;
-        case Screen::SD_BROWSER: count = static_cast<int>(_directoryEntries.size()) + 4; break;
+        case Screen::SD_BROWSER:
+            count = static_cast<int>(_directoryEntries.size()) + 4 +
+                    (_directoryOffset > 0 ? 1 : 0) + (_directoryHasMore ? 1 : 0);
+            break;
         case Screen::SD_FORMAT_CONFIRM: case Screen::SD_DELETE_CONFIRM: count = 2; break;
         default: return;
     }
@@ -602,7 +605,8 @@ void Application::back() {
         _screen = Screen::SD_BROWSER;
         refreshDirectory();
         _selectedItem = _viewerReturnSelection;
-        const int maxSelection = static_cast<int>(_directoryEntries.size()) + 3;
+        const int maxSelection = static_cast<int>(_directoryEntries.size()) + 3 +
+            (_directoryOffset > 0 ? 1 : 0) + (_directoryHasMore ? 1 : 0);
         if (_selectedItem > maxSelection) _selectedItem = maxSelection;
         if (_selectedItem < 0) _selectedItem = 0;
         _selectedFile = _selectedItem;
@@ -708,6 +712,7 @@ void Application::runSDAction(int action) {
 
     if (action == 0) {
         _currentPath = "/";
+        _directoryOffset = 0;
         _selectedItem = 0;
         refreshDirectory();
         _screen = Screen::SD_BROWSER;
@@ -739,19 +744,39 @@ void Application::runSDAction(int action) {
 }
 
 void Application::refreshDirectory() {
-    _directoryEntries = _storage.listDirectory(_currentPath);
-    const int maxSelection = static_cast<int>(_directoryEntries.size());
+    _directoryEntries = _storage.listDirectory(
+        _currentPath, _directoryOffset, DIRECTORY_PAGE_SIZE, &_directoryHasMore);
+    const int maxSelection = static_cast<int>(_directoryEntries.size()) + 3 +
+                             (_directoryOffset > 0 ? 1 : 0) +
+                             (_directoryHasMore ? 1 : 0);
     if (_selectedItem > maxSelection) _selectedItem = maxSelection;
     if (_selectedItem < 0) _selectedItem = 0;
 }
 
 void Application::openSelectedFile() {
     const int fileCount = static_cast<int>(_directoryEntries.size());
+    const int previousPageIndex = fileCount + 4;
+    const int nextPageIndex = previousPageIndex + (_directoryOffset > 0 ? 1 : 0);
     if (_selectedFile == 0) {
         if (_currentPath != "/") back();
         else showResult("SD ROOT", _directoryEntries.empty()
             ? "Card is mounted. The root folder is empty."
-            : String(fileCount) + " item(s) in root.");
+            : String(fileCount) + " item(s) on this page.");
+        return;
+    }
+    if (_directoryOffset > 0 && _selectedFile == previousPageIndex) {
+        _directoryOffset = _directoryOffset > DIRECTORY_PAGE_SIZE
+            ? _directoryOffset - DIRECTORY_PAGE_SIZE : 0;
+        _selectedItem = 0;
+        refreshDirectory();
+        render();
+        return;
+    }
+    if (_directoryHasMore && _selectedFile == nextPageIndex) {
+        _directoryOffset += DIRECTORY_PAGE_SIZE;
+        _selectedItem = 0;
+        refreshDirectory();
+        render();
         return;
     }
     if (_selectedFile == fileCount + 1) {
@@ -902,9 +927,11 @@ void Application::render() {
             labels.push_back("[+] Create folder");
             labels.push_back("[-] Delete last listed item");
             labels.push_back("[R] Rename last listed item");
-            const String directoryStatus = _directoryEntries.empty()
-                ? "EMPTY  " + _currentPath
-                : String(_directoryEntries.size()) + " item(s)  " + _currentPath;
+            if (_directoryOffset > 0) labels.push_back("[<] Previous page");
+            if (_directoryHasMore) labels.push_back("[>] Next page");
+            const String directoryStatus = String(_directoryOffset + 1) + "-" +
+                String(_directoryOffset + _directoryEntries.size()) +
+                (_directoryHasMore ? "+ items  " : " items  ") + _currentPath;
             _display.drawList("FILE MANAGER", labels, _selectedItem, directoryStatus);
             break;
         }
