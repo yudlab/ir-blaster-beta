@@ -7,6 +7,7 @@
 
 class IRService {
 public:
+    IRService();
     bool begin();
     void poll();
     void handleCommand(const String& line, Print& output);
