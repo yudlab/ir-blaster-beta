@@ -449,74 +449,127 @@ bool IRService::runSavedScript(const String& name) {
 }
 
 
-void IRService::listUniversalBrands(std::vector<String>& items) {
+void IRService::listUniversalBrands(std::vector<String>& items, size_t offset,
+                                   size_t limit, bool* hasMore) {
     items.clear();
-    items.reserve(24);
+    if (hasMore) *hasMore = false;
+    if (!limit) return;
+    items.reserve(limit);
     File root = SD_MMC.open("/codes");
     if (!root || !root.isDirectory()) { if (root) root.close(); return; }
+
+    size_t seen = 0;
     File entry = root.openNextFile();
     while (entry) {
         if (entry.isDirectory()) {
-            String name = String(entry.name());
+            if (seen++ < offset) {
+                entry.close();
+                entry = root.openNextFile();
+                if ((seen & 0x0F) == 0) yield();
+                continue;
+            }
+            if (items.size() >= limit) {
+                if (hasMore) *hasMore = true;
+                entry.close();
+                break;
+            }
+            String name = entry.name();
             const int slash = name.lastIndexOf('/');
-            if (slash >= 0) name = name.substring(slash + 1);
-            items.push_back(name);
+            if (slash >= 0) name.remove(0, slash + 1);
+            items.emplace_back(name);
         }
         entry.close();
         entry = root.openNextFile();
+        if ((seen & 0x0F) == 0) yield();
     }
     root.close();
-    std::sort(items.begin(), items.end());
 }
 
-void IRService::listUniversalCategories(const String& brand, std::vector<String>& items) {
+void IRService::listUniversalCategories(const String& brand, std::vector<String>& items,
+                                       size_t offset, size_t limit, bool* hasMore) {
     items.clear();
-    items.reserve(24);
-    File root = SD_MMC.open(childPath("/codes", brand));
+    if (hasMore) *hasMore = false;
+    if (!limit) return;
+    items.reserve(limit);
+    const String folder = childPath("/codes", brand);
+    File root = SD_MMC.open(folder);
     if (!root || !root.isDirectory()) { if (root) root.close(); return; }
+
+    size_t seen = 0;
     File entry = root.openNextFile();
     while (entry) {
         if (entry.isDirectory()) {
-            String name = String(entry.name());
+            if (seen++ < offset) {
+                entry.close();
+                entry = root.openNextFile();
+                if ((seen & 0x0F) == 0) yield();
+                continue;
+            }
+            if (items.size() >= limit) {
+                if (hasMore) *hasMore = true;
+                entry.close();
+                break;
+            }
+            String name = entry.name();
             const int slash = name.lastIndexOf('/');
-            if (slash >= 0) name = name.substring(slash + 1);
-            items.push_back(name);
+            if (slash >= 0) name.remove(0, slash + 1);
+            items.emplace_back(name);
         }
         entry.close();
         entry = root.openNextFile();
+        if ((seen & 0x0F) == 0) yield();
     }
     root.close();
-    std::sort(items.begin(), items.end());
 }
 
 void IRService::listUniversalFiles(const String& brand, const String& category,
-                                   std::vector<String>& items) {
+                                   std::vector<String>& items, size_t offset,
+                                   size_t limit, bool* hasMore) {
     items.clear();
-    items.reserve(24);
+    if (hasMore) *hasMore = false;
+    if (!limit) return;
+    items.reserve(limit);
     const String folder = childPath(childPath("/codes", brand), category);
     File root = SD_MMC.open(folder);
     if (!root || !root.isDirectory()) { if (root) root.close(); return; }
+
+    size_t seen = 0;
     File entry = root.openNextFile();
     while (entry) {
-        String path = String(entry.name());
+        String path = entry.name();
         if (!entry.isDirectory() && path.endsWith(".csv")) {
-            items.push_back(csvBaseName(path));
+            if (seen++ < offset) {
+                entry.close();
+                entry = root.openNextFile();
+                if ((seen & 0x0F) == 0) yield();
+                continue;
+            }
+            if (items.size() >= limit) {
+                if (hasMore) *hasMore = true;
+                entry.close();
+                break;
+            }
+            items.emplace_back(csvBaseName(path));
         }
         entry.close();
         entry = root.openNextFile();
+        if ((seen & 0x0F) == 0) yield();
     }
     root.close();
-    std::sort(items.begin(), items.end());
 }
 
-void IRService::listUniversalButtons(const String& csvPath, std::vector<String>& items) {
+void IRService::listUniversalButtons(const String& csvPath, std::vector<String>& items,
+                                     size_t offset, size_t limit, bool* hasMore) {
     items.clear();
-    items.reserve(24);
+    if (hasMore) *hasMore = false;
+    if (!limit) return;
+    items.reserve(limit);
     File file = SD_MMC.open(csvPath, FILE_READ);
     if (!file || file.isDirectory()) { if (file) file.close(); return; }
 
     char line[CSV_LINE_CAPACITY];
     char fields[5][CSV_FIELD_CAPACITY];
+    size_t row = 0;
     while (file.available()) {
         if (!readCsvLine(file, line, sizeof(line))) continue;
         stripCsvBom(line);
@@ -525,6 +578,11 @@ void IRService::listUniversalButtons(const String& csvPath, std::vector<String>&
         if (!*text || strncmp(text, "functionname,", 13) == 0) continue;
         if (!parseCsvFieldsFixed(text, fields)) continue;
 
+        if (row++ < offset) continue;
+        if (items.size() >= limit) {
+            if (hasMore) *hasMore = true;
+            break;
+        }
         char fallback[24];
         const char* label = fields[0];
         if (!label[0]) {
