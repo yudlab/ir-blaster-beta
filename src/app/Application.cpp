@@ -3,7 +3,6 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include <Wire.h>
-#include <ctype.h>
 
 namespace {
 constexpr uint8_t SX1509_REG_DIR_B = 0x0E;
@@ -49,8 +48,8 @@ volatile uint32_t buttonQueueTimes[BUTTON_QUEUE_SIZE] = {};
 volatile bool buttonQueueStates[BUTTON_QUEUE_SIZE] = {};
 volatile bool buttonQueueOverflow = false;
 
-// Hall-effect trackball outputs generate digital pulses as the ball rotates.
-// Count falling edges in the ISR and process them in the main application loop.
+// Hall-effect trackball outputs pulse LOW as the ball rotates.
+// The SX1509 port is sampled frequently and falling transitions are queued.
 portMUX_TYPE trackballMux = portMUX_INITIALIZER_UNLOCKED;
 volatile uint16_t trackballUpEdges = 0;
 volatile uint16_t trackballDownEdges = 0;
