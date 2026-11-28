@@ -109,8 +109,11 @@ void IRService::poll() {
                    result.truncated() ? "yes" : "no");
     if (_learning) {
         const bool saved = saveCapture(result, _learnRemote, _learnButton);
-        Serial0.printf("[IR] %s %s/%s\n", saved ? "Saved" : "Save failed",
-                       _learnRemote.c_str(), _learnButton.c_str());
+        _lastCaptureSucceeded = saved;
+        _captureFinished = true;
+        _lastCaptureLabel = _learnRemote + "/" + _learnButton;
+        Serial0.printf("[IR] %s %s\\n", saved ? "Saved" : "Save failed",
+                       _lastCaptureLabel.c_str());
         _learning = false;
         _learnRemote = "";
         _learnButton = "";
