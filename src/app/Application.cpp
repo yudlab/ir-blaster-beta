@@ -266,7 +266,14 @@ void Application::moveSelection(int direction) {
         case Screen::IR_MENU: count = 5; break;
         case Screen::IR_RUN_SOURCE: count = 2; break;
         case Screen::IR_SAVE_TARGET: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
-        case Screen::IR_UNIVERSAL: case Screen::IR_BUTTON_ACTION: case Screen::IR_SHORTCUTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
+        case Screen::IR_UNIVERSAL:
+            count = static_cast<int>(_irItems.size()) +
+                    (_universalOffset > 0 ? 1 : 0) + (_universalHasMore ? 1 : 0);
+            if (count < 1) count = 1;
+            break;
+        case Screen::IR_BUTTON_ACTION: case Screen::IR_SHORTCUTS:
+            count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size());
+            break;
         case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::SD_TOOLBOX: count = 6; break;
@@ -299,7 +306,9 @@ void Application::select() {
             _screen = Screen::IR_SAVE_TARGET;
         } else if (_selectedItem == 1) {
             _universalLevel = 0;
-            _ir.listUniversalBrands(_irItems);
+            _universalOffset = 0;
+            _ir.listUniversalBrands(_irItems, _universalOffset,
+                                    UNIVERSAL_PAGE_SIZE, &_universalHasMore);
             _screen = Screen::IR_UNIVERSAL;
         } else if (_selectedItem == 2) {
             _ir.listShortcuts(_irItems);
@@ -377,36 +386,58 @@ void Application::select() {
     }
 
     if (_screen == Screen::IR_UNIVERSAL) {
-        if (_irItems.empty()) {
-            _messageTitle = "NO IRDB DATA";
-            _messageBody = "Copy the IRDB codes folder to the SD card root as /codes.";
-            _screen = Screen::IR_STATUS;
-            render();
-            return;
-        }
-        if (_universalLevel == 0) {
-            _universalBrand = _irItems[_selectedItem];
-            _ir.listUniversalCategories(_universalBrand, _irItems);
-            _universalLevel = 1;
-        } else if (_universalLevel == 1) {
-            _universalCategory = _irItems[_selectedItem];
-            _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems);
-            _universalLevel = 2;
-        } else if (_universalLevel == 2) {
-            _universalFile = _irItems[_selectedItem];
-            _universalCsvPath = "/codes/" + _universalBrand + "/" +
-                                _universalCategory + "/" + _universalFile + ".csv";
-            _ir.listUniversalButtons(_universalCsvPath, _irItems);
-            _universalLevel = 3;
+        const size_t itemCount = _irItems.size();
+        const int previousPageIndex = static_cast<int>(itemCount);
+        const int nextPageIndex = previousPageIndex + (_universalOffset > 0 ? 1 : 0);
+
+        if (_universalOffset > 0 && _selectedItem == previousPageIndex) {
+            _universalOffset = _universalOffset > UNIVERSAL_PAGE_SIZE
+                ? _universalOffset - UNIVERSAL_PAGE_SIZE : 0;
+        } else if (_universalHasMore && _selectedItem == nextPageIndex) {
+            _universalOffset += UNIVERSAL_PAGE_SIZE;
         } else {
-            _selectedUniversalRow = static_cast<size_t>(_selectedItem);
-            _selectedUniversalLabel = _irItems[_selectedItem];
-            _buttonActionIsUniversal = true;
-            _irItems = {"Send now", "Add to Remote Shortcuts"};
-            _selectedItem = 0;
-            _screen = Screen::IR_BUTTON_ACTION;
-            render();
-            return;
+            if (_irItems.empty() || _selectedItem < 0 ||
+                static_cast<size_t>(_selectedItem) >= itemCount) {
+                _messageTitle = "NO IRDB DATA";
+                _messageBody = "No entries here. Check the /codes folder on the SD card.";
+                _screen = Screen::IR_STATUS;
+                render();
+                return;
+            }
+
+            if (_universalLevel == 0) {
+                _universalBrand = _irItems[_selectedItem];
+                _universalOffset = 0;
+                _ir.listUniversalCategories(_universalBrand, _irItems,
+                                            _universalOffset, UNIVERSAL_PAGE_SIZE,
+                                            &_universalHasMore);
+                _universalLevel = 1;
+            } else if (_universalLevel == 1) {
+                _universalCategory = _irItems[_selectedItem];
+                _universalOffset = 0;
+                _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems,
+                                       _universalOffset, UNIVERSAL_PAGE_SIZE,
+                                       &_universalHasMore);
+                _universalLevel = 2;
+            } else if (_universalLevel == 2) {
+                _universalFile = _irItems[_selectedItem];
+                _universalCsvPath = "/codes/" + _universalBrand + "/" +
+                                    _universalCategory + "/" + _universalFile + ".csv";
+                _universalOffset = 0;
+                _ir.listUniversalButtons(_universalCsvPath, _irItems,
+                                         _universalOffset, UNIVERSAL_PAGE_SIZE,
+                                         &_universalHasMore);
+                _universalLevel = 3;
+            } else {
+                _selectedUniversalRow = _universalOffset + static_cast<size_t>(_selectedItem);
+                _selectedUniversalLabel = _irItems[_selectedItem];
+                _buttonActionIsUniversal = true;
+                _irItems = {"Send now", "Add to Remote Shortcuts"};
+                _selectedItem = 0;
+                _screen = Screen::IR_BUTTON_ACTION;
+                render();
+                return;
+            }
         }
         _selectedItem = 0;
         render();
@@ -540,7 +571,9 @@ void Application::back() {
     }
     if (_screen == Screen::IR_BUTTON_ACTION) {
         if (_buttonActionIsUniversal) {
-            _ir.listUniversalButtons(_universalCsvPath, _irItems);
+            _ir.listUniversalButtons(_universalCsvPath, _irItems,
+                                     _universalOffset, UNIVERSAL_PAGE_SIZE,
+                                     &_universalHasMore);
             _screen = Screen::IR_UNIVERSAL;
         } else {
             _ir.listSavedButtons(_selectedRemote, _irItems);
@@ -558,14 +591,17 @@ void Application::back() {
         return;
     }
     if (_screen == Screen::IR_UNIVERSAL) {
+        _universalOffset = 0;
         if (_universalLevel == 3) {
-            _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems);
+            _ir.listUniversalFiles(_universalBrand, _universalCategory, _irItems,
+                                   0, UNIVERSAL_PAGE_SIZE, &_universalHasMore);
             _universalLevel = 2;
         } else if (_universalLevel == 2) {
-            _ir.listUniversalCategories(_universalBrand, _irItems);
+            _ir.listUniversalCategories(_universalBrand, _irItems,
+                                        0, UNIVERSAL_PAGE_SIZE, &_universalHasMore);
             _universalLevel = 1;
         } else if (_universalLevel == 1) {
-            _ir.listUniversalBrands(_irItems);
+            _ir.listUniversalBrands(_irItems, 0, UNIVERSAL_PAGE_SIZE, &_universalHasMore);
             _universalLevel = 0;
         } else {
             _screen = Screen::IR_MENU;
@@ -895,7 +931,10 @@ void Application::render() {
             const String footer = _universalLevel == 0 ? "Browse /codes by brand" :
                                   _universalLevel == 1 ? "Choose device category" :
                                   _universalLevel == 2 ? "Choose CSV code set" : "Select a button";
-            _display.drawList(title, _irItems, _selectedItem, footer);
+            std::vector<String> labels = _irItems;
+            if (_universalOffset > 0) labels.emplace_back("[<] Previous page");
+            if (_universalHasMore) labels.emplace_back("[>] Next page");
+            _display.drawList(title, labels, _selectedItem, footer);
             break;
         }
         case Screen::IR_BUTTON_ACTION:
