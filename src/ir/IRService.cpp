@@ -21,7 +21,64 @@ bool parseKeyValue(const String& line, const char* key, uint32_t& value) {
 }
 }
 
-IRService::IRService()
+
+namespace {
+bool parseCsvFields(const String& line, std::vector<String>& fields) {
+    fields.clear();
+    String field;
+    bool quoted = false;
+    for (size_t i = 0; i < line.length(); ++i) {
+        const char ch = line[i];
+        if (ch == '"') {
+            if (quoted && i + 1 < line.length() && line[i + 1] == '"') {
+                field += '"'; ++i;
+            } else quoted = !quoted;
+        } else if (ch == ',' && !quoted) {
+            field.trim(); fields.push_back(field); field = "";
+        } else field += ch;
+    }
+    field.trim(); fields.push_back(field);
+    return !quoted;
+}
+
+String csvBaseName(const String& path) {
+    String name = path.substring(path.lastIndexOf('/') + 1);
+    if (name.endsWith(".csv")) name.remove(name.length() - 4);
+    return name;
+}
+
+String childPath(const String& parent, const String& name) {
+    return parent.endsWith("/") ? parent + name : parent + "/" + name;
+}
+
+String cleanShortcutField(String value) {
+    value.replace("|", "_");
+    value.replace("\\n", " ");
+    value.replace("\\r", " ");
+    value.replace("\\t", " ");
+    value.trim();
+    return value;
+}
+
+bool readCsvDataRow(const String& path, size_t wanted, std::vector<String>& fields) {
+    File file = SD_MMC.open(path, FILE_READ);
+    if (!file || file.isDirectory()) { if (file) file.close(); return false; }
+    size_t row = 0;
+    bool found = false;
+    while (file.available()) {
+        String line = file.readStringUntil('\\n');
+        line.trim();
+        if (!line.length() || line.startsWith("functionname,")) continue;
+        if (row++ == wanted) {
+            found = parseCsvFields(line, fields);
+            break;
+        }
+    }
+    file.close();
+    return found && fields.size() >= 5;
+}
+}
+\nIRService::IRService()
     : _rx(IRConfig::PIN_RX, IRConfig::RX_INVERTED), _tx(IRConfig::PIN_TX) {}
 
 bool IRService::begin() {
@@ -325,7 +382,207 @@ bool IRService::runSavedScript(const String& name) {
     return true;
 }
 
-void IRService::listRemotes(Print& output) {
+
+void IRService::listUniversalBrands(std::vector<String>& items) {
+    items.clear();
+    File root = SD_MMC.open("/codes");
+    if (!root || !root.isDirectory()) { if (root) root.close(); return; }
+    File entry = root.openNextFile();
+    while (entry) {
+        if (entry.isDirectory()) {
+            String name = String(entry.name());
+            const int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            items.push_back(name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+    std::sort(items.begin(), items.end());
+}
+
+void IRService::listUniversalCategories(const String& brand, std::vector<String>& items) {
+    items.clear();
+    File root = SD_MMC.open(childPath("/codes", brand));
+    if (!root || !root.isDirectory()) { if (root) root.close(); return; }
+    File entry = root.openNextFile();
+    while (entry) {
+        if (entry.isDirectory()) {
+            String name = String(entry.name());
+            const int slash = name.lastIndexOf('/');
+            if (slash >= 0) name = name.substring(slash + 1);
+            items.push_back(name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+    std::sort(items.begin(), items.end());
+}
+
+void IRService::listUniversalFiles(const String& brand, const String& category,
+                                   std::vector<String>& items) {
+    items.clear();
+    const String folder = childPath(childPath("/codes", brand), category);
+    File root = SD_MMC.open(folder);
+    if (!root || !root.isDirectory()) { if (root) root.close(); return; }
+    File entry = root.openNextFile();
+    while (entry) {
+        String path = String(entry.name());
+        if (!entry.isDirectory() && path.endsWith(".csv")) {
+            items.push_back(csvBaseName(path));
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+    std::sort(items.begin(), items.end());
+}
+
+void IRService::listUniversalButtons(const String& csvPath, std::vector<String>& items) {
+    items.clear();
+    File file = SD_MMC.open(csvPath, FILE_READ);
+    if (!file || file.isDirectory()) { if (file) file.close(); return; }
+    while (file.available()) {
+        String line = file.readStringUntil('\\n');
+        line.trim();
+        if (!line.length() || line.startsWith("functionname,")) continue;
+        std::vector<String> fields;
+        if (!parseCsvFields(line, fields) || fields.size() < 5) continue;
+        String label = fields[0].length() ? fields[0] : ("Function " + fields[4]);
+        items.push_back(label);
+    }
+    file.close();
+}
+
+bool IRService::sendUniversalButton(const String& csvPath, size_t rowIndex) {
+    std::vector<String> fields;
+    if (!readCsvDataRow(csvPath, rowIndex, fields)) return false;
+
+    String protocol = fields[1];
+    protocol.trim();
+    protocol.toUpperCase();
+    const long device = fields[2].toInt();
+    const long subdevice = fields[3].toInt();
+    const long function = fields[4].toInt();
+    if (device < 0 || device > 65535 || subdevice < -1 || subdevice > 65535 ||
+        function < 0 || function > 0xFFFFF) return false;
+
+    esp32irpk::IRDecodedBits decoded{};
+    decoded.frame_type = esp32irpk::IRFrameType::NORMAL;
+
+    if (protocol == "NECX2" || protocol == "NEC") {
+        // IRDB stores NEC extended-address bytes as device/subdevice.
+        const uint16_t address = static_cast<uint16_t>(
+            (device & 0xFF) | ((subdevice < 0 ? 0 : (subdevice & 0xFF)) << 8));
+        if (function > 0xFF) return false;
+        decoded = esp32irpk::bits::nec(address, static_cast<uint8_t>(function));
+    } else if (protocol == "SONY12" || protocol == "SONY15" || protocol == "SONY20") {
+        if (function > 0x7F || device > 0x1FFF) return false;
+        const uint32_t data = static_cast<uint32_t>(function) |
+                              (static_cast<uint32_t>(device) << 7);
+        if (protocol == "SONY12") {
+            if (device > 0x1F) return false;
+            decoded = esp32irpk::bits::sony12(data);
+        } else if (protocol == "SONY15") {
+            if (device > 0xFF) return false;
+            decoded = esp32irpk::bits::sony15(data);
+        } else {
+            decoded = esp32irpk::bits::sony20(data);
+        }
+    } else if (protocol == "JVC") {
+        if (device > 0xFF || function > 0xFF) return false;
+        decoded = esp32irpk::bits::jvc(static_cast<uint8_t>(device),
+                                       static_cast<uint8_t>(function));
+    } else if (protocol == "RC5") {
+        if (device > 0x1F || function > 0x3F) return false;
+        const uint16_t frame = static_cast<uint16_t>(0x3000U |
+            ((device & 0x1F) << 6) | (function & 0x3F));
+        decoded = esp32irpk::bits::rc5(frame);
+    } else if (protocol == "SAMSUNG32") {
+        if (device > 0xFF || subdevice < -1 || subdevice > 0xFF || function > 0xFFFF) return false;
+        const uint16_t address = static_cast<uint16_t>((device & 0xFF) |
+            ((subdevice < 0 ? 0 : (subdevice & 0xFF)) << 8));
+        decoded = esp32irpk::bits::samsung32(address, static_cast<uint16_t>(function));
+    } else {
+        Serial0.print("[IRDB] Unsupported protocol: ");
+        Serial0.println(protocol);
+        return false;
+    }
+
+    return _ready && _tx.send(decoded);
+}
+
+bool IRService::addUniversalShortcut(const String& csvPath, size_t rowIndex,
+                                     const String& label) {
+    if (!SD_MMC.exists("/IR")) SD_MMC.mkdir("/IR");
+    File file = SD_MMC.open("/IR/shortcuts.txt", FILE_APPEND);
+    if (!file) return false;
+    file.print("U|"); file.print(cleanShortcutField(csvPath)); file.print("|");
+    file.print(static_cast<unsigned long>(rowIndex)); file.print("|");
+    file.println(cleanShortcutField(label));
+    file.flush();
+    const bool ok = file.getWriteError() == 0;
+    file.close();
+    return ok;
+}
+
+bool IRService::addCustomShortcut(const String& remote, const String& button) {
+    if (!SD_MMC.exists("/IR")) SD_MMC.mkdir("/IR");
+    File file = SD_MMC.open("/IR/shortcuts.txt", FILE_APPEND);
+    if (!file) return false;
+    file.print("C|"); file.print(cleanShortcutField(remote)); file.print("|");
+    file.print(cleanShortcutField(button)); file.print("|");
+    file.println(cleanShortcutField(remote + " " + button));
+    file.flush();
+    const bool ok = file.getWriteError() == 0;
+    file.close();
+    return ok;
+}
+
+void IRService::listShortcuts(std::vector<String>& items) {
+    items.clear();
+    File file = SD_MMC.open("/IR/shortcuts.txt", FILE_READ);
+    if (!file) return;
+    while (file.available()) {
+        String line = file.readStringUntil('\\n');
+        line.trim();
+        const int a = line.indexOf('|');
+        const int b = line.indexOf('|', a + 1);
+        const int c = line.indexOf('|', b + 1);
+        if (a < 0 || b < 0 || c < 0) continue;
+        String label = line.substring(c + 1);
+        items.push_back(label.length() ? label : "Shortcut");
+    }
+    file.close();
+}
+
+bool IRService::sendShortcut(size_t wanted) {
+    File file = SD_MMC.open("/IR/shortcuts.txt", FILE_READ);
+    if (!file) return false;
+    size_t index = 0;
+    bool ok = false;
+    while (file.available()) {
+        String line = file.readStringUntil('\\n');
+        line.trim();
+        const int a = line.indexOf('|');
+        const int b = line.indexOf('|', a + 1);
+        const int c = line.indexOf('|', b + 1);
+        if (a < 0 || b < 0 || c < 0) continue;
+        if (index++ != wanted) continue;
+        const String type = line.substring(0, a);
+        const String first = line.substring(a + 1, b);
+        const String second = line.substring(b + 1, c);
+        if (type == "U") ok = sendUniversalButton(first, static_cast<size_t>(second.toInt()));
+        else if (type == "C") ok = sendSavedButton(first, second);
+        break;
+    }
+    file.close();
+    return ok;
+}
+
+\nvoid IRService::listRemotes(Print& output) {
     File root = SD_MMC.open("/IR/remotes");
     if (!root || !root.isDirectory()) { output.println("No saved remotes yet."); return; }
     File remote = root.openNextFile();
