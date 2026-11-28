@@ -18,7 +18,9 @@ public:
 
 private:
     enum class Screen {
-        HOME, SD_TOOLBOX, SD_BROWSER, SD_INFO, SD_RESULT,
+        HOME, IR_MENU, IR_SAVE_WAIT, IR_STATUS, IR_SAVED_REMOTES,
+        IR_SAVED_BUTTONS, IR_DATABASE, IR_SCRIPTS,
+        SD_TOOLBOX, SD_BROWSER, SD_INFO, SD_RESULT,
         SD_FORMAT_CONFIRM, SD_DELETE_CONFIRM, CAMERA, IMAGE_VIEWER, SYSTEM_INFO, MESSAGE
     };
 
@@ -48,6 +50,9 @@ private:
     String _resultBody;
     String _pendingDeletePath;
     std::vector<StorageEntry> _directoryEntries;
+    std::vector<String> _irItems;
+    String _selectedRemote;
+    String _selectedDatabaseCode;
 
     void render();
     void updateCameraPreview();
