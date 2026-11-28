@@ -278,15 +278,21 @@ void Application::moveSelection(int direction) {
 
 void Application::select() {
     if (_screen == Screen::HOME) { openHomeItem(); return; }
+
     if (_screen == Screen::IR_MENU) {
         if (!_storage.isMounted() && !_storage.begin()) {
-            _messageTitle = "SD NOT READY"; _messageBody = "Insert a working SD card."; _screen = Screen::IR_STATUS; render(); return;
+            _messageTitle = "SD NOT READY";
+            _messageBody = "Insert a working SD card.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
         }
         if (_selectedItem == 0) {
             _ir.beginScreenLearn();
             _screen = _ir.captureFinished() ? Screen::IR_STATUS : Screen::IR_SAVE_WAIT;
             if (_screen == Screen::IR_STATUS) {
-                _messageTitle = "IR SAVE FAILED"; _messageBody = _ir.lastCaptureLabel();
+                _messageTitle = "IR SAVE FAILED";
+                _messageBody = _ir.lastCaptureLabel();
             }
         } else if (_selectedItem == 1) {
             _ir.listSavedRemotes(_irItems);
@@ -298,39 +304,86 @@ void Application::select() {
             _ir.listScripts(_irItems);
             _screen = Screen::IR_SCRIPTS;
         }
-        _selectedItem = 0; render(); return;
+        _selectedItem = 0;
+        render();
+        return;
     }
+
     if (_screen == Screen::IR_SAVED_REMOTES) {
-        if (_irItems.empty()) { _messageTitle = "NO SAVED REMOTES"; _messageBody = "Record a remote first."; _screen = Screen::IR_STATUS; render(); return; }
+        if (_irItems.empty()) {
+            _messageTitle = "NO SAVED REMOTES";
+            _messageBody = "Record a remote first.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
+        }
         _selectedRemote = _irItems[_selectedItem];
         _ir.listSavedButtons(_selectedRemote, _irItems);
-        _selectedItem = 0; _screen = Screen::IR_SAVED_BUTTONS; render(); return;
+        _selectedItem = 0;
+        _screen = Screen::IR_SAVED_BUTTONS;
+        render();
+        return;
     }
+
     if (_screen == Screen::IR_SAVED_BUTTONS) {
-        if (_irItems.empty()) { _messageTitle = "NO BUTTONS"; _messageBody = "This remote has no saved buttons."; _screen = Screen::IR_STATUS; render(); return; }
+        if (_irItems.empty()) {
+            _messageTitle = "NO BUTTONS";
+            _messageBody = "This remote has no saved buttons.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
+        }
         const String button = _irItems[_selectedItem];
         const bool ok = _ir.sendSavedButton(_selectedRemote, button);
         _messageTitle = ok ? "IR SENT" : "IR SEND FAILED";
         _messageBody = _selectedRemote + "\\n" + button;
-        _screen = Screen::IR_STATUS; render(); return;
+        _screen = Screen::IR_STATUS;
+        render();
+        return;
     }
+
     if (_screen == Screen::IR_DATABASE) {
-        if (_irItems.empty()) { _messageTitle = "DATABASE EMPTY"; _messageBody = "Place compatible .ir files in /IR/database on the SD card."; _screen = Screen::IR_STATUS; render(); return; }
-        const String path = String("/IR/database/") + _irItems[_selectedItem];
-        const bool ok = _ir.sendDatabaseCode(path);
+        if (_irItems.empty()) {
+            _messageTitle = "DATABASE EMPTY";
+            _messageBody = "Put compatible .ir files in /IR/database on the SD card.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
+        }
+        const String code = _irItems[_selectedItem];
+        const bool ok = _ir.sendDatabaseCode(String("/IR/database/") + code);
         _messageTitle = ok ? "DATABASE CODE SENT" : "SEND FAILED";
-        _messageBody = _irItems[_selectedItem];
-        _screen = Screen::IR_STATUS; render(); return;
+        _messageBody = code;
+        _screen = Screen::IR_STATUS;
+        render();
+        return;
     }
+
     if (_screen == Screen::IR_SCRIPTS) {
-        if (_irItems.empty()) { _messageTitle = "NO SCRIPTS"; _messageBody = "No saved scripts found on SD."; _screen = Screen::IR_STATUS; render(); return; }
+        if (_irItems.empty()) {
+            _messageTitle = "NO SCRIPTS";
+            _messageBody = "No saved scripts found on SD.";
+            _screen = Screen::IR_STATUS;
+            render();
+            return;
+        }
         const String name = _irItems[_selectedItem];
         _ir.runSavedScript(name);
-        _messageTitle = "SCRIPT FINISHED"; _messageBody = name;
-        _screen = Screen::IR_STATUS; render(); return;
+        _messageTitle = "SCRIPT FINISHED";
+        _messageBody = name;
+        _screen = Screen::IR_STATUS;
+        render();
+        return;
     }
-    if (_screen == Screen::IR_STATUS) { _screen = Screen::IR_MENU; _selectedItem = 0; render(); return; }
+
+    if (_screen == Screen::IR_STATUS) {
+        _screen = Screen::IR_MENU;
+        _selectedItem = 0;
+        render();
+        return;
+    }
     if (_screen == Screen::IR_SAVE_WAIT) return;
+
     if (_screen == Screen::SD_TOOLBOX) { runSDAction(_selectedItem); return; }
     if (_screen == Screen::SD_BROWSER) { _selectedFile = _selectedItem; openSelectedFile(); return; }
     if (_screen == Screen::SD_DELETE_CONFIRM) {
@@ -355,21 +408,7 @@ void Application::select() {
     if (_screen == Screen::IMAGE_VIEWER) { back(); return; }
     if (_screen == Screen::SD_RESULT || _screen == Screen::SD_INFO ||
         _screen == Screen::SYSTEM_INFO || _screen == Screen::MESSAGE) {
-        if (_screen == Screen::IR_STATUS || _screen == Screen::IR_SAVE_WAIT ||
-        _screen == Screen::IR_SAVED_BUTTONS || _screen == Screen::IR_SAVED_REMOTES ||
-        _screen == Screen::IR_DATABASE || _screen == Screen::IR_SCRIPTS) {
-        if (_screen == Screen::IR_SAVED_BUTTONS) {
-            _ir.listSavedRemotes(_irItems);
-            _screen = Screen::IR_SAVED_REMOTES;
-        } else if (_screen == Screen::IR_SAVED_REMOTES || _screen == Screen::IR_DATABASE || _screen == Screen::IR_SCRIPTS) {
-            _screen = Screen::IR_MENU;
-        } else {
-            _screen = Screen::IR_MENU;
-        }
-        _selectedItem = 0; render(); return;
-    }
-    if (_screen == Screen::IR_MENU) { returnHome(); return; }
-    if (_screen == Screen::SD_RESULT) {
+        if (_screen == Screen::SD_RESULT) {
             _screen = _resultReturnScreen;
             _selectedItem = _resultReturnSelection;
             if (_screen == Screen::SD_BROWSER) refreshDirectory();
@@ -383,6 +422,27 @@ void Application::select() {
 }
 
 void Application::back() {
+    if (_screen == Screen::IR_STATUS || _screen == Screen::IR_SAVE_WAIT) {
+        _screen = Screen::IR_MENU;
+        _selectedItem = 0;
+        render();
+        return;
+    }
+    if (_screen == Screen::IR_SAVED_BUTTONS) {
+        _ir.listSavedRemotes(_irItems);
+        _screen = Screen::IR_SAVED_REMOTES;
+        _selectedItem = 0;
+        render();
+        return;
+    }
+    if (_screen == Screen::IR_SAVED_REMOTES || _screen == Screen::IR_DATABASE ||
+        _screen == Screen::IR_SCRIPTS) {
+        _screen = Screen::IR_MENU;
+        _selectedItem = 0;
+        render();
+        return;
+    }
+    if (_screen == Screen::IR_MENU) { returnHome(); return; }
     if (_screen == Screen::SD_RESULT) {
         _screen = _resultReturnScreen;
         _selectedItem = _resultReturnSelection;
@@ -396,8 +456,6 @@ void Application::back() {
         return;
     }
     if (_screen == Screen::IMAGE_VIEWER) {
-        // Restore the exact folder and highlighted entry from which the image
-        // was opened, rather than relying on whatever browser state remains.
         _currentPath = _viewerReturnPath;
         _screen = Screen::SD_BROWSER;
         refreshDirectory();
