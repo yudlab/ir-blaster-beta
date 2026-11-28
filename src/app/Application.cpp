@@ -264,6 +264,7 @@ void Application::moveSelection(int direction) {
     switch (_screen) {
         case Screen::HOME: count = 5; break;
         case Screen::IR_MENU: count = 4; break;
+        case Screen::IR_SAVE_TARGET: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::IR_SAVED_REMOTES: case Screen::IR_SAVED_BUTTONS:
         case Screen::IR_DATABASE: case Screen::IR_SCRIPTS: count = _irItems.empty() ? 1 : static_cast<int>(_irItems.size()); break;
         case Screen::SD_TOOLBOX: count = 6; break;
@@ -288,12 +289,9 @@ void Application::select() {
             return;
         }
         if (_selectedItem == 0) {
-            _ir.beginScreenLearn();
-            _screen = _ir.captureFinished() ? Screen::IR_STATUS : Screen::IR_SAVE_WAIT;
-            if (_screen == Screen::IR_STATUS) {
-                _messageTitle = "IR SAVE FAILED";
-                _messageBody = _ir.lastCaptureLabel();
-            }
+            _ir.listSavedRemotes(_irItems);
+            _irItems.push_back(" [ New remote ]");
+            _screen = Screen::IR_SAVE_TARGET;
         } else if (_selectedItem == 1) {
             _ir.listSavedRemotes(_irItems);
             _screen = Screen::IR_SAVED_REMOTES;
@@ -303,6 +301,21 @@ void Application::select() {
         } else {
             _ir.listScripts(_irItems);
             _screen = Screen::IR_SCRIPTS;
+        }
+        _selectedItem = 0;
+        render();
+        return;
+    }
+
+    if (_screen == Screen::IR_SAVE_TARGET) {
+        String remote;
+        if (_selectedItem >= static_cast<int>(_irItems.size()) - 1) remote = _ir.nextRemoteName();
+        else remote = _irItems[_selectedItem];
+        _ir.beginScreenLearn(remote);
+        _screen = _ir.captureFinished() ? Screen::IR_STATUS : Screen::IR_SAVE_WAIT;
+        if (_screen == Screen::IR_STATUS) {
+            _messageTitle = "IR SAVE FAILED";
+            _messageBody = _ir.lastCaptureLabel();
         }
         _selectedItem = 0;
         render();
@@ -435,7 +448,7 @@ void Application::back() {
         render();
         return;
     }
-    if (_screen == Screen::IR_SAVED_REMOTES || _screen == Screen::IR_DATABASE ||
+    if (_screen == Screen::IR_SAVE_TARGET || _screen == Screen::IR_SAVED_REMOTES || _screen == Screen::IR_DATABASE ||
         _screen == Screen::IR_SCRIPTS) {
         _screen = Screen::IR_MENU;
         _selectedItem = 0;
@@ -699,6 +712,9 @@ void Application::render() {
             _display.drawList("IR", items, _selectedItem, _ir.ready() ? "IR RX/TX READY" : "IR HARDWARE NOT READY");
             break;
         }
+        case Screen::IR_SAVE_TARGET:
+            _display.drawList("SAVE IR TO", _irItems, _selectedItem, "Choose remote or New remote");
+            break;
         case Screen::IR_SAVE_WAIT:
             _display.drawMessage("RECORD IR", "Point remote at receiver.\\nPress the remote button once.\\nSaving to Remote_01 on SD...");
             break;
