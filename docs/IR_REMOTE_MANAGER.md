@@ -26,10 +26,9 @@ The firmware probes SX1509 addresses 0x3E and 0x3F at startup. Connect the expan
 
 From the home screen select **IR**. The IR menu contains:
 
-1. **Save IR** — point a remote at the receiver and press one button. The firmware stores the raw capture on the SD card.
-2. **Run IR Code** — choose a saved remote, then choose a button to transmit it.
-3. **IR Database** — choose a compatible database code stored on the SD card.
-4. **Scripts** — choose and execute a saved script.
+1. **Save IR** — choose an existing remote profile or create a new profile, then point the original remote at the receiver and press one button.
+2. **Run IR Code** — choose either **Saved on SD** (select a remote, then a button) or **IR Database** (select a compatible database code).
+3. **Scripts** — choose and execute a saved script.
 
 The screen-based recorder lets you select an existing remote profile or create a new one. New profiles are named `Remote_01`, `Remote_02`, and so on; buttons are named `Button_01`, `Button_02`, and so on within each profile. This makes recording possible without a keyboard; custom remote/button naming and on-screen script authoring are not yet implemented.
 
