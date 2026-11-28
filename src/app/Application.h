@@ -38,6 +38,8 @@ private:
     bool _buttonStableState = true;
     uint32_t _buttonLastAcceptedChange = 0;
     uint32_t _buttonPressedAt = 0;
+    uint32_t _buttonPendingClickAt = 0;
+    bool _buttonPendingClick = false;
     String _currentPath = "/";
     String _viewerReturnPath = "/";
     String _cameraStatus = "Starting camera...";
